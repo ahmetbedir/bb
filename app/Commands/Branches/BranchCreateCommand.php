@@ -10,8 +10,8 @@ use function Laravel\Prompts\text;
 class BranchCreateCommand extends BitbucketCommand
 {
     protected $signature = 'branch:create
-        {repo : Repository as "workspace/repo" or just "repo"}
         {name? : New branch name}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--from= : Source branch name or commit hash to branch from}';
 
     protected $description = 'Create a branch';
@@ -22,7 +22,7 @@ class BranchCreateCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 

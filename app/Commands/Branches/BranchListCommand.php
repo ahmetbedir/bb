@@ -9,9 +9,11 @@ use Illuminate\Support\Str;
 class BranchListCommand extends BitbucketCommand
 {
     protected $signature = 'branch:list
-        {repo : Repository as "workspace/repo" or just "repo"}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--q= : Bitbucket query filter, e.g. "name ~ \"feature\""}
-        {--limit=50 : Maximum number of branches to show}';
+        {--limit=50 : Maximum number of branches to show}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'List branches for a repository';
 
@@ -21,7 +23,7 @@ class BranchListCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 
@@ -39,6 +41,10 @@ class BranchListCommand extends BitbucketCommand
 
         if ($branches === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($branches);
         }
 
         if ($branches === []) {

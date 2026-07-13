@@ -8,8 +8,11 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\GetPullRequest;
 class PrShowCommand extends BitbucketCommand
 {
     protected $signature = 'pr:show
-        {repo : Repository as "workspace/repo" or just "repo"}
-        {id : Pull request id}';
+        {id : Pull request id}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--web : Open the pull request in a browser instead of printing details}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'Show details for a single pull request';
 
@@ -19,19 +22,30 @@ class PrShowCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 
         [$workspace, $slug] = $resolved;
+        $id = $this->argument('id');
 
-        $response = $this->send(new GetPullRequest($workspace, $slug, $this->argument('id')));
+        if ($this->option('web')) {
+            $this->openInBrowser("https://bitbucket.org/{$workspace}/{$slug}/pull-requests/{$id}");
+
+            return self::SUCCESS;
+        }
+
+        $response = $this->send(new GetPullRequest($workspace, $slug, $id));
 
         if ($response === null) {
             return self::FAILURE;
         }
 
         $pr = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($pr);
+        }
 
         $this->table([], [
             ['#', $pr['id'] ?? ''],

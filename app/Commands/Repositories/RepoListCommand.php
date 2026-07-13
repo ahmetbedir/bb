@@ -10,7 +10,9 @@ class RepoListCommand extends BitbucketCommand
     protected $signature = 'repo:list
         {workspace? : Workspace to list (defaults to configured workspace)}
         {--limit=50 : Maximum number of repositories to show}
-        {--q= : Bitbucket query filter, e.g. "name ~ \"api\""}';
+        {--q= : Bitbucket query filter, e.g. "name ~ \"api\""}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'List repositories in a workspace';
 
@@ -40,6 +42,10 @@ class RepoListCommand extends BitbucketCommand
 
         if ($repos === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($repos);
         }
 
         if ($repos === []) {

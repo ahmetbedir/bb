@@ -10,7 +10,7 @@ use function Laravel\Prompts\text;
 class IssueCreateCommand extends BitbucketCommand
 {
     protected $signature = 'issue:create
-        {repo : Repository as "workspace/repo" or just "repo"}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--title= : Issue title}
         {--content= : Issue description (raw markdown)}
         {--kind=bug : bug, enhancement, proposal or task}
@@ -24,7 +24,7 @@ class IssueCreateCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 

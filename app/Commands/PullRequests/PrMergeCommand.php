@@ -8,8 +8,8 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\MergePullRequest;
 class PrMergeCommand extends BitbucketCommand
 {
     protected $signature = 'pr:merge
-        {repo : Repository as "workspace/repo" or just "repo"}
         {id : Pull request id}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--strategy=merge_commit : merge_commit, squash or fast_forward}
         {--message= : Custom merge commit message}
         {--close-source-branch : Close the source branch after merge}';
@@ -22,7 +22,7 @@ class PrMergeCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 

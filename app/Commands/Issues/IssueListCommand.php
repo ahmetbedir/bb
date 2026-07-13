@@ -9,9 +9,11 @@ use Illuminate\Support\Str;
 class IssueListCommand extends BitbucketCommand
 {
     protected $signature = 'issue:list
-        {repo : Repository as "workspace/repo" or just "repo"}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--state= : Filter by state: new, open, resolved, closed, on hold, invalid, duplicate, wontfix}
-        {--limit=50 : Maximum number of issues to show}';
+        {--limit=50 : Maximum number of issues to show}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'List issues for a repository (issue tracker must be enabled)';
 
@@ -21,7 +23,7 @@ class IssueListCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 
@@ -39,6 +41,10 @@ class IssueListCommand extends BitbucketCommand
 
         if ($issues === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($issues);
         }
 
         if ($issues === []) {

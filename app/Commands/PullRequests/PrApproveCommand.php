@@ -8,8 +8,8 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\ApprovePullRequest;
 class PrApproveCommand extends BitbucketCommand
 {
     protected $signature = 'pr:approve
-        {repo : Repository as "workspace/repo" or just "repo"}
-        {id : Pull request id}';
+        {id : Pull request id}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}';
 
     protected $description = 'Approve a pull request';
 
@@ -19,7 +19,7 @@ class PrApproveCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 

@@ -8,7 +8,10 @@ use App\Http\Integrations\Bitbucket\Requests\Repositories\GetRepository;
 class RepoShowCommand extends BitbucketCommand
 {
     protected $signature = 'repo:show
-        {repo : Repository as "workspace/repo" or just "repo"}';
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--web : Open the repository in a browser instead of printing details}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'Show details for a single repository';
 
@@ -18,11 +21,17 @@ class RepoShowCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 
         [$workspace, $slug] = $resolved;
+
+        if ($this->option('web')) {
+            $this->openInBrowser("https://bitbucket.org/{$workspace}/{$slug}");
+
+            return self::SUCCESS;
+        }
 
         $response = $this->send(new GetRepository($workspace, $slug));
 
@@ -31,6 +40,10 @@ class RepoShowCommand extends BitbucketCommand
         }
 
         $r = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($r);
+        }
 
         $cloneHttps = collect($r['links']['clone'] ?? [])->firstWhere('name', 'https')['href'] ?? '';
         $cloneSsh = collect($r['links']['clone'] ?? [])->firstWhere('name', 'ssh')['href'] ?? '';

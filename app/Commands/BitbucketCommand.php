@@ -5,9 +5,11 @@ namespace App\Commands;
 use App\Http\Integrations\Bitbucket\BitbucketConnector;
 use App\Http\Integrations\Bitbucket\Requests\NextPageRequest;
 use App\Support\CredentialStore;
+use App\Support\GitContext;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
+use Symfony\Component\Process\Process;
 
 /**
  * Base command for everything that talks to the Bitbucket API. Provides the
@@ -41,30 +43,113 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
-     * Resolve a "repo" argument into [workspace, repo_slug].
+     * Resolve the target repository as [workspace, repo_slug], mirroring `gh`:
+     *   1. the --repo / -R flag ("workspace/repo" or bare "repo")
+     *   2. the git remote of the current directory
      *
-     * Accepts either "workspace/repo" or just "repo" (falling back to the
-     * configured default workspace).
+     * Commands that call this must declare a {--R|repo=} option.
      *
      * @return array{0: string, 1: string}|null
      */
-    protected function resolveRepo(string $repo): ?array
+    protected function resolveRepo(): ?array
     {
-        if (str_contains($repo, '/')) {
-            [$workspace, $slug] = explode('/', $repo, 2);
+        $repo = $this->hasOption('repo') ? $this->option('repo') : null;
 
-            return [$workspace, $slug];
-        }
+        if (filled($repo)) {
+            if (str_contains($repo, '/')) {
+                [$workspace, $slug] = explode('/', $repo, 2);
 
-        $workspace = $this->credentials()->get('workspace');
+                return [$workspace, $slug];
+            }
 
-        if (blank($workspace)) {
-            $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bbcli configure");
+            if (filled($workspace = $this->credentials()->get('workspace'))) {
+                return [$workspace, $repo];
+            }
+
+            $this->error("No workspace given. Use \"-R workspace/{$repo}\" or set a default with: bbcli configure");
 
             return null;
         }
 
-        return [$workspace, $repo];
+        if ($detected = app(GitContext::class)->currentRepo()) {
+            return $detected;
+        }
+
+        $this->error('No repository given and none detected from the current git remote. Pass "-R workspace/repo".');
+
+        return null;
+    }
+
+    /**
+     * Whether the command was asked to emit machine-readable JSON.
+     */
+    protected function wantsJson(): bool
+    {
+        return $this->hasOption('json') && (bool) $this->option('json');
+    }
+
+    /**
+     * Print data as JSON, optionally filtered through the `jq` binary.
+     */
+    protected function outputJson(mixed $data): int
+    {
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        $filter = $this->hasOption('jq') ? $this->option('jq') : null;
+
+        if (blank($filter)) {
+            $this->output->writeln($json);
+
+            return self::SUCCESS;
+        }
+
+        $process = new Process(['jq', $filter]);
+        $process->setInput($json);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            $this->error(trim($process->getErrorOutput()) ?: 'jq failed (is it installed?)');
+
+            return self::FAILURE;
+        }
+
+        $this->output->write($process->getOutput());
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Open a URL in the user's default browser (respects the --web flag caller).
+     */
+    protected function openInBrowser(string $url): void
+    {
+        $opener = match (PHP_OS_FAMILY) {
+            'Darwin' => 'open',
+            'Windows' => 'start',
+            default => 'xdg-open',
+        };
+
+        $this->line("Opening {$url}");
+
+        try {
+            Process::fromShellCommandline($opener.' '.escapeshellarg($url))->run();
+        } catch (\Throwable $e) {
+            $this->warn('Could not open browser: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Run a git command, streaming its output to the terminal.
+     */
+    protected function git(array $args, ?string $cwd = null): bool
+    {
+        $process = new Process(['git', ...$args], $cwd, timeout: null);
+
+        $process->run(function ($type, $buffer) {
+            $this->output->write($buffer);
+        });
+
+        return $process->isSuccessful();
     }
 
     /**

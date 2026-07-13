@@ -9,9 +9,11 @@ use Illuminate\Support\Str;
 class PrListCommand extends BitbucketCommand
 {
     protected $signature = 'pr:list
-        {repo : Repository as "workspace/repo" or just "repo"}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--state=OPEN : OPEN, MERGED, DECLINED or SUPERSEDED}
-        {--limit=50 : Maximum number of pull requests to show}';
+        {--limit=50 : Maximum number of pull requests to show}
+        {--json : Output raw JSON}
+        {--jq= : Filter JSON output through a jq expression}';
 
     protected $description = 'List pull requests for a repository';
 
@@ -21,7 +23,7 @@ class PrListCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        if (! $resolved = $this->resolveRepo($this->argument('repo'))) {
+        if (! $resolved = $this->resolveRepo()) {
             return self::FAILURE;
         }
 
@@ -35,6 +37,10 @@ class PrListCommand extends BitbucketCommand
 
         if ($prs === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($prs);
         }
 
         if ($prs === []) {
