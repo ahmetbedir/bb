@@ -13,7 +13,8 @@ class PrListCommand extends BitbucketCommand
         {--state=OPEN : OPEN, MERGED, DECLINED or SUPERSEDED}
         {--limit=50 : Maximum number of pull requests to show}
         {--json : Output raw JSON}
-        {--jq= : Filter JSON output through a jq expression}';
+        {--jq= : Filter JSON output through a jq expression}
+        {--boxed : Display pull requests in a box instead of a table}';
 
     protected $description = 'List pull requests for a repository';
 
@@ -49,6 +50,19 @@ class PrListCommand extends BitbucketCommand
             return self::SUCCESS;
         }
 
+        $asBox = (bool) $this->option('boxed');
+        if ($asBox) {
+            $this->displayBox($prs);
+        } else {
+            $this->displayTable($prs);
+        }
+
+        return self::SUCCESS;
+    }
+
+    protected function displayTable(array $prs): void
+    {
+
         $this->table(
             ['#', 'Title', 'State', 'Author', 'Source', 'Dest', 'Updated'],
             array_map(fn (array $pr) => [
@@ -61,7 +75,24 @@ class PrListCommand extends BitbucketCommand
                 isset($pr['updated_on']) ? substr($pr['updated_on'], 0, 10) : '',
             ], $prs),
         );
+    }
 
-        return self::SUCCESS;
+    protected function displayBox(array $prs): void
+    {
+        foreach ($prs as $pr) {
+            $this->table([], [
+                ['#', $pr['id'] ?? ''],
+                ['Title', $pr['title'] ?? ''],
+                ['State', $pr['state'] ?? ''],
+                ['Author', $pr['author']['display_name'] ?? ''],
+                ['Source', $pr['source']['branch']['name'] ?? ''],
+                ['Destination', $pr['destination']['branch']['name'] ?? ''],
+                ['Reviewers', collect($pr['reviewers'] ?? [])->pluck('display_name')->implode(', ')],
+                ['Comments', $pr['comment_count'] ?? 0],
+                ['Created', $pr['created_on'] ?? ''],
+                ['Updated', $pr['updated_on'] ?? ''],
+                ['Web', $pr['links']['html']['href'] ?? ''],
+            ]);
+        }
     }
 }
