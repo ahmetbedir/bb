@@ -4,14 +4,17 @@ namespace App\Http\Integrations\Bitbucket;
 
 use App\Support\CredentialStore;
 use Saloon\Contracts\Authenticator;
+use Saloon\Helpers\OAuth2\OAuthConfig;
 use Saloon\Http\Auth\BasicAuthenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
+use Saloon\Traits\OAuth2\AuthorizationCodeGrant;
 use Saloon\Traits\Plugins\AcceptsJson;
 
 class BitbucketConnector extends Connector
 {
     use AcceptsJson;
+    use AuthorizationCodeGrant;
 
     public function __construct(protected CredentialStore $credentials) {}
 
@@ -39,8 +42,28 @@ class BitbucketConnector extends Connector
             'token' => new TokenAuthenticator(
                 (string) $this->credentials->get('token'),
             ),
+            'oauth' => new TokenAuthenticator(
+                (string) $this->credentials->get('oauth.access_token'),
+            ),
             default => null,
         };
+    }
+
+    /**
+     * OAuth 2.0 (authorization code grant) settings for `bbcli auth login`.
+     * Endpoints live on bitbucket.org, not the api.* host, so we allow the
+     * base URL to be overridden by the absolute endpoints below.
+     */
+    protected function defaultOauthConfig(): OAuthConfig
+    {
+        return OAuthConfig::make()
+            ->setClientId((string) $this->credentials->get('oauth.client_id'))
+            ->setClientSecret((string) $this->credentials->get('oauth.client_secret'))
+            ->setRedirectUri((string) $this->credentials->get('oauth.redirect_uri', 'http://localhost:8888/callback'))
+            ->setAuthorizeEndpoint('https://bitbucket.org/site/oauth2/authorize')
+            ->setTokenEndpoint('https://bitbucket.org/site/oauth2/access_token')
+            ->setUserEndpoint('https://api.bitbucket.org/2.0/user')
+            ->setAllowBaseUrlOverride();
     }
 
     protected function defaultHeaders(): array

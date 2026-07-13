@@ -25,7 +25,40 @@ abstract class BitbucketCommand extends Command
 
     protected function connector(): BitbucketConnector
     {
+        $this->refreshOAuthIfNeeded();
+
         return new BitbucketConnector($this->credentials());
+    }
+
+    /**
+     * Transparently refresh an expiring OAuth access token before use.
+     */
+    protected function refreshOAuthIfNeeded(): void
+    {
+        $store = $this->credentials();
+
+        if ($store->get('method') !== 'oauth') {
+            return;
+        }
+
+        $expiresAt = $store->get('oauth.expires_at');
+        $refreshToken = $store->get('oauth.refresh_token');
+
+        if (blank($refreshToken) || blank($expiresAt) || time() < ((int) $expiresAt - 60)) {
+            return;
+        }
+
+        try {
+            $authenticator = (new BitbucketConnector($store))->refreshAccessToken((string) $refreshToken);
+
+            $store->fill([
+                'oauth.access_token' => $authenticator->getAccessToken(),
+                'oauth.refresh_token' => $authenticator->getRefreshToken() ?? $refreshToken,
+                'oauth.expires_at' => $authenticator->getExpiresAt()?->getTimestamp(),
+            ])->save();
+        } catch (\Throwable $e) {
+            $this->warn('OAuth token refresh failed ('.$e->getMessage().'). Run "bbcli auth login" again if requests fail.');
+        }
     }
 
     /**
@@ -145,9 +178,20 @@ abstract class BitbucketCommand extends Command
     {
         $process = new Process(['git', ...$args], $cwd, timeout: null);
 
-        $process->run(function ($type, $buffer) {
+        $process->run(function ($type, string $buffer) {
             $this->output->write($buffer);
         });
+
+        return $process->isSuccessful();
+    }
+
+    /**
+     * Run a git command silently and report only whether it succeeded.
+     */
+    protected function gitQuiet(array $args, ?string $cwd = null): bool
+    {
+        $process = new Process(['git', ...$args], $cwd);
+        $process->run();
 
         return $process->isSuccessful();
     }

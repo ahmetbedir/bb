@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Arr;
+
 /**
  * Reads and writes bbcli credentials to a JSON file in the user's home
  * directory (~/.config/bbcli/config.json by default).
@@ -47,6 +49,7 @@ class CredentialStore
         return match ($this->get('method')) {
             'app_password' => filled($this->get('username')) && filled($this->get('app_password')),
             'token' => filled($this->get('token')),
+            'oauth' => filled($this->get('oauth.access_token')),
             default => false,
         };
     }
@@ -70,7 +73,16 @@ class CredentialStore
     public function set(string $key, mixed $value): static
     {
         $data = $this->all();
-        $data[$key] = $value;
+        data_set($data, $key, $value);
+        $this->data = $data;
+
+        return $this;
+    }
+
+    public function forget(string $key): static
+    {
+        $data = $this->all();
+        Arr::forget($data, $key);
         $this->data = $data;
 
         return $this;
