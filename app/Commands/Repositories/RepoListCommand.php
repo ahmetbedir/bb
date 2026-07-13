@@ -25,7 +25,7 @@ class RepoListCommand extends BitbucketCommand
         $workspace = $this->argument('workspace') ?: $this->credentials()->get('workspace');
 
         if (blank($workspace)) {
-            $this->error('No workspace given. Pass one as an argument or set a default with: bbcli configure');
+            $this->error('No workspace given. Pass one as an argument or set a default with: bb configure');
 
             return self::FAILURE;
         }

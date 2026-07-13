@@ -57,7 +57,7 @@ abstract class BitbucketCommand extends Command
                 'oauth.expires_at' => $authenticator->getExpiresAt()?->getTimestamp(),
             ])->save();
         } catch (\Throwable $e) {
-            $this->warn('OAuth token refresh failed ('.$e->getMessage().'). Run "bbcli auth login" again if requests fail.');
+            $this->warn('OAuth token refresh failed ('.$e->getMessage().'). Run "bb auth login" again if requests fail.');
         }
     }
 
@@ -70,7 +70,7 @@ abstract class BitbucketCommand extends Command
             return true;
         }
 
-        $this->error('bbcli is not configured yet. Run: bbcli configure');
+        $this->error('bb is not configured yet. Run: bb configure');
 
         return false;
     }
@@ -99,7 +99,7 @@ abstract class BitbucketCommand extends Command
                 return [$workspace, $repo];
             }
 
-            $this->error("No workspace given. Use \"-R workspace/{$repo}\" or set a default with: bbcli configure");
+            $this->error("No workspace given. Use \"-R workspace/{$repo}\" or set a default with: bb configure");
 
             return null;
         }
@@ -132,7 +132,7 @@ abstract class BitbucketCommand extends Command
             return [$workspace, $repo];
         }
 
-        $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bbcli configure");
+        $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bb configure");
 
         return null;
     }

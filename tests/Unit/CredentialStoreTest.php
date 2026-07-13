@@ -4,7 +4,7 @@ use App\Support\CredentialStore;
 
 function tempStore(): CredentialStore
 {
-    return new CredentialStore(sys_get_temp_dir().'/bbcli-test-'.uniqid().'/config.json');
+    return new CredentialStore(sys_get_temp_dir().'/bb-test-'.uniqid().'/config.json');
 }
 
 it('is not configured when empty', function () {
@@ -50,7 +50,7 @@ it('stores and forgets nested dot-notation keys', function () {
 });
 
 it('persists and reloads values', function () {
-    $path = sys_get_temp_dir().'/bbcli-test-'.uniqid().'/config.json';
+    $path = sys_get_temp_dir().'/bb-test-'.uniqid().'/config.json';
 
     (new CredentialStore($path))->fill(['method' => 'token', 'token' => 'abc'])->save();
 

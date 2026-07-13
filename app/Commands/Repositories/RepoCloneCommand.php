@@ -27,7 +27,7 @@ class RepoCloneCommand extends BitbucketCommand
         } elseif (filled($workspace = $this->credentials()->get('workspace'))) {
             $slug = $repo;
         } else {
-            $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bbcli configure");
+            $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bb configure");
 
             return self::FAILURE;
         }

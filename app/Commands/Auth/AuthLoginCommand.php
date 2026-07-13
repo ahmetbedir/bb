@@ -22,7 +22,7 @@ class AuthLoginCommand extends BitbucketCommand
 
     /**
      * Scopes requested for the token. Adjust to taste — these cover the
-     * repository, pull request and issue commands bbcli ships with.
+     * repository, pull request and issue commands bb ships with.
      */
     private const SCOPES = ['account', 'repository', 'repository:write', 'pullrequest', 'pullrequest:write', 'issue', 'issue:write'];
 

@@ -6,7 +6,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Detects the Bitbucket repository for the current working directory by
- * inspecting its git remotes — this is what lets bbcli work like `gh`,
+ * inspecting its git remotes — this is what lets bb work like `gh`,
  * where you can run commands inside a checkout without naming the repo.
  */
 class GitContext

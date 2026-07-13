@@ -8,7 +8,7 @@ use Saloon\Http\Request;
 use Saloon\Traits\Body\HasJsonBody;
 
 /**
- * A generic, dynamically-built request — the engine behind `bbcli api`.
+ * A generic, dynamically-built request — the engine behind `bb api`.
  * The HTTP method, endpoint, query and JSON body are all supplied at runtime.
  */
 class ApiRequest extends Request implements HasBody

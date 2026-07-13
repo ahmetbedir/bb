@@ -7,7 +7,7 @@ use Saloon\Http\Faking\MockClient;
 use Saloon\Http\Faking\MockResponse;
 
 beforeEach(function () {
-    $store = (new CredentialStore(sys_get_temp_dir().'/bbcli-pr-'.uniqid().'/config.json'))
+    $store = (new CredentialStore(sys_get_temp_dir().'/bb-pr-'.uniqid().'/config.json'))
         ->fill(['method' => 'token', 'token' => 'test-token']);
 
     $this->app->instance(CredentialStore::class, $store);

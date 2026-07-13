@@ -50,7 +50,7 @@ class BitbucketConnector extends Connector
     }
 
     /**
-     * OAuth 2.0 (authorization code grant) settings for `bbcli auth login`.
+     * OAuth 2.0 (authorization code grant) settings for `bb auth login`.
      * Endpoints live on bitbucket.org, not the api.* host, so we allow the
      * base URL to be overridden by the absolute endpoints below.
      */

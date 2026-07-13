@@ -1,4 +1,4 @@
-# bbcli
+# bb
 
 A `gh`-style command-line client for **Bitbucket Cloud**, built with
 [Laravel Zero](https://laravel-zero.com) and [Saloon](https://docs.saloon.dev).
@@ -25,12 +25,12 @@ Or run from source during development:
 
 ```bash
 composer install
-php bbcli <command>
+php bb <command>
 ```
 
 ## Authentication
 
-bbcli supports three auth methods. Pick one:
+bb supports three auth methods. Pick one:
 
 ### OAuth (browser) — recommended
 
@@ -38,7 +38,7 @@ Create an OAuth consumer in **Workspace settings → OAuth consumers** with the
 callback URL `http://localhost:8888/callback`, then:
 
 ```bash
-bbcli auth login
+bb auth login
 ```
 
 Tokens are refreshed automatically when they expire.
@@ -46,28 +46,28 @@ Tokens are refreshed automatically when they expire.
 ### App password / API token
 
 ```bash
-bbcli configure
+bb configure
 ```
 
 - **App password**: username + an [app password](https://bitbucket.org/account/settings/app-passwords/).
 - **API / access token**: sent as a Bearer token.
 
-Credentials are stored in `~/.config/bbcli/config.json` (mode `0600`).
+Credentials are stored in `~/.config/bb/config.json` (mode `0600`).
 
 ### Check / clear
 
 ```bash
-bbcli auth status
-bbcli auth logout
+bb auth status
+bb auth logout
 ```
 
-## Use git over HTTPS via bbcli
+## Use git over HTTPS via bb
 
-Register bbcli as a git credential helper so `git push`/`git pull` authenticate
+Register bb as a git credential helper so `git push`/`git pull` authenticate
 transparently for `bitbucket.org`:
 
 ```bash
-bbcli auth setup-git
+bb auth setup-git
 ```
 
 ## Selecting a repository
@@ -80,8 +80,8 @@ Commands that act on a repo resolve it in this order (like `gh`):
 
 ```bash
 cd my-repo/          # inside a Bitbucket checkout
-bbcli pr:list        # repo detected from origin
-bbcli pr:list -R acme/other-repo
+bb pr:list        # repo detected from origin
+bb pr:list -R acme/other-repo
 ```
 
 ## Commands
@@ -93,7 +93,7 @@ bbcli pr:list -R acme/other-repo
 | `auth:status` | Show current authentication status |
 | `auth:logout` | Remove stored credentials |
 | `auth:token` | Print the bearer token (for scripting) |
-| `auth:setup-git` | Configure git HTTPS auth via bbcli |
+| `auth:setup-git` | Configure git HTTPS auth via bb |
 
 ### Repositories
 | Command | Description |
@@ -156,9 +156,9 @@ bbcli pr:list -R acme/other-repo
 Most read commands support `--json` for raw output and `--jq` to filter it:
 
 ```bash
-bbcli repo:list acme --json --jq='.[].slug'
-bbcli pr:list -R acme/api --json --jq='.[] | select(.state=="OPEN") | .title'
-bbcli api /repositories/acme/api --jq='.mainbranch.name'
+bb repo:list acme --json --jq='.[].slug'
+bb pr:list -R acme/api --json --jq='.[] | select(.state=="OPEN") | .title'
+bb api /repositories/acme/api --jq='.mainbranch.name'
 ```
 
 ## Development

@@ -6,8 +6,8 @@ use App\Commands\BitbucketCommand;
 
 /**
  * Implements the git credential helper protocol so `git push/pull` over HTTPS
- * can authenticate with bbcli's stored credentials. Registered by
- * `bbcli auth setup-git`; git invokes it as `bbcli auth git-credential get`.
+ * can authenticate with bb's stored credentials. Registered by
+ * `bb auth setup-git`; git invokes it as `bb auth git-credential get`.
  *
  * @see https://git-scm.com/docs/gitcredentials
  */

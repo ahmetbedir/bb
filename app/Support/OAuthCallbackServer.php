@@ -7,7 +7,7 @@ use RuntimeException;
 /**
  * A tiny single-shot HTTP server that captures the OAuth redirect from the
  * browser. It listens on a loopback address, waits for one request, parses
- * the query string and returns it — this is how `bbcli auth login` receives
+ * the query string and returns it — this is how `bb auth login` receives
  * the authorization code without the user copy-pasting anything.
  */
 class OAuthCallbackServer
@@ -86,7 +86,7 @@ class OAuthCallbackServer
 
         $html = <<<HTML
             <!doctype html>
-            <html><head><meta charset="utf-8"><title>bbcli</title>
+            <html><head><meta charset="utf-8"><title>bb</title>
             <style>body{font-family:system-ui,sans-serif;display:flex;height:100vh;margin:0;align-items:center;justify-content:center;background:#0b1424;color:#e7edf6}
             .card{text-align:center;padding:2rem 3rem;border:1px solid #24334d;border-radius:12px;background:#111d33}
             h1{margin:0 0 .5rem;font-size:1.25rem}p{margin:0;color:#9fb2cc}</style></head>

@@ -8,7 +8,7 @@ class AuthSetupGitCommand extends BitbucketCommand
 {
     protected $signature = 'auth:setup-git';
 
-    protected $description = 'Configure git to authenticate bitbucket.org over HTTPS using bbcli';
+    protected $description = 'Configure git to authenticate bitbucket.org over HTTPS using bb';
 
     public function handle(): int
     {
@@ -16,7 +16,7 @@ class AuthSetupGitCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        $binary = realpath($_SERVER['argv'][0] ?? '') ?: 'bbcli';
+        $binary = realpath($_SERVER['argv'][0] ?? '') ?: 'bb';
         $key = 'credential.https://bitbucket.org.helper';
 
         // Clear any existing helpers for this host, then register ours. The
@@ -32,7 +32,7 @@ class AuthSetupGitCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        $this->info('Configured git to use bbcli for bitbucket.org HTTPS authentication.');
+        $this->info('Configured git to use bb for bitbucket.org HTTPS authentication.');
         $this->line(' git will now call: <comment>'.$binary.' auth git-credential</comment>');
 
         return self::SUCCESS;

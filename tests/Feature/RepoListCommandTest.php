@@ -7,7 +7,7 @@ use Saloon\Http\Faking\MockResponse;
 
 beforeEach(function () {
     // A configured, in-memory credential store so commands pass the guard.
-    $store = (new CredentialStore(sys_get_temp_dir().'/bbcli-feature-'.uniqid().'/config.json'))
+    $store = (new CredentialStore(sys_get_temp_dir().'/bb-feature-'.uniqid().'/config.json'))
         ->fill(['method' => 'token', 'token' => 'test-token', 'workspace' => 'acme']);
 
     $this->app->instance(CredentialStore::class, $store);
@@ -32,7 +32,7 @@ it('lists repositories from the api', function () {
 it('warns when not configured', function () {
     $this->app->instance(
         CredentialStore::class,
-        new CredentialStore(sys_get_temp_dir().'/bbcli-empty-'.uniqid().'/config.json'),
+        new CredentialStore(sys_get_temp_dir().'/bb-empty-'.uniqid().'/config.json'),
     );
 
     $this->artisan('repo:list acme')

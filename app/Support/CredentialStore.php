@@ -5,8 +5,8 @@ namespace App\Support;
 use Illuminate\Support\Arr;
 
 /**
- * Reads and writes bbcli credentials to a JSON file in the user's home
- * directory (~/.config/bbcli/config.json by default).
+ * Reads and writes bb credentials to a JSON file in the user's home
+ * directory (~/.config/bb/config.json by default).
  *
  * Supported auth methods:
  *   - "app_password": Basic auth using username + Bitbucket App Password
@@ -23,12 +23,12 @@ class CredentialStore
 
     public static function defaultPath(): string
     {
-        $home = getenv('BBCLI_HOME')
+        $home = getenv('BB_HOME')
             ?: getenv('HOME')
             ?: getenv('USERPROFILE')
             ?: sys_get_temp_dir();
 
-        return rtrim($home, '/').'/.config/bbcli/config.json';
+        return rtrim($home, '/').'/.config/bb/config.json';
     }
 
     public function path(): string

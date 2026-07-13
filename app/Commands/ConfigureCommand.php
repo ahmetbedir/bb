@@ -15,7 +15,7 @@ class ConfigureCommand extends BitbucketCommand
         {--username= : Bitbucket username (for app_password)}
         {--workspace= : Default workspace to use when none is given}';
 
-    protected $description = 'Configure Bitbucket credentials for bbcli';
+    protected $description = 'Configure Bitbucket credentials for bb';
 
     public function handle(): int
     {

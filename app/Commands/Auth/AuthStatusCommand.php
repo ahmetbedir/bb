@@ -16,7 +16,7 @@ class AuthStatusCommand extends BitbucketCommand
         $store = $this->credentials();
 
         if (! $store->isConfigured()) {
-            $this->warn('Not logged in. Run "bbcli auth login" or "bbcli configure".');
+            $this->warn('Not logged in. Run "bb auth login" or "bb configure".');
 
             return self::FAILURE;
         }
