@@ -23,10 +23,11 @@ it('lists build statuses and fails on a failed check', function () {
         ], 200),
     ]);
 
-    $this->artisan('pr:checks 5 --repo=acme/api')
-        ->expectsOutputToContain('SUCCESSFUL')
-        ->expectsOutputToContain('FAILED')
-        ->assertFailed();
+    [$code, $output] = runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api']);
+
+    expect($output)->toContain('SUCCESSFUL')->toContain('FAILED');
+    // Non-zero exit when a check has FAILED.
+    expect($code)->toBe(1);
 });
 
 it('reports no statuses cleanly', function () {

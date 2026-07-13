@@ -53,11 +53,11 @@ class PrListCommand extends BitbucketCommand
             ['#', 'Title', 'State', 'Author', 'Source', 'Dest', 'Updated'],
             array_map(fn (array $pr) => [
                 $pr['id'] ?? '',
-                Str::limit($pr['title'] ?? '', 45),
+                Str::limit($pr['title'] ?? '', 40),
                 $pr['state'] ?? '',
                 $pr['author']['display_name'] ?? '',
-                $pr['source']['branch']['name'] ?? '',
-                $pr['destination']['branch']['name'] ?? '',
+                Str::limit($pr['source']['branch']['name'] ?? '', 24),
+                Str::limit($pr['destination']['branch']['name'] ?? '', 24),
                 isset($pr['updated_on']) ? substr($pr['updated_on'], 0, 10) : '',
             ], $prs),
         );

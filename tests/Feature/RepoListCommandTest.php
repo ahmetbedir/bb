@@ -23,10 +23,12 @@ it('lists repositories from the api', function () {
         ], 200),
     ]);
 
-    $this->artisan('repo:list acme')
-        ->expectsOutputToContain('Api Service')
-        ->expectsOutputToContain('web-app')
-        ->assertSuccessful();
+    // Laravel Prompts renders to its own output stream, which the artisan
+    // test double doesn't capture — run through the kernel with a buffer.
+    [$code, $output] = runCommand('repo:list', ['workspace' => 'acme']);
+
+    expect($code)->toBe(0);
+    expect($output)->toContain('Api Service')->toContain('web-app');
 });
 
 it('warns when not configured', function () {

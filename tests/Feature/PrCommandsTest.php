@@ -27,9 +27,10 @@ function mockPrs(): void
 it('resolves the repo from the --repo flag', function () {
     mockPrs();
 
-    $this->artisan('pr:list --repo=acme/api')
-        ->expectsOutputToContain('Add caching')
-        ->assertSuccessful();
+    [$code, $output] = runCommand('pr:list', ['--repo' => 'acme/api']);
+
+    expect($code)->toBe(0);
+    expect($output)->toContain('Add caching');
 });
 
 it('resolves the repo from the current git context when no flag is given', function () {
@@ -43,9 +44,10 @@ it('resolves the repo from the current git context when no flag is given', funct
         }
     });
 
-    $this->artisan('pr:list')
-        ->expectsOutputToContain('Add caching')
-        ->assertSuccessful();
+    [$code, $output] = runCommand('pr:list');
+
+    expect($code)->toBe(0);
+    expect($output)->toContain('Add caching');
 });
 
 it('fails when no repo can be resolved', function () {

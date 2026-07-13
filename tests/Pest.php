@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Contracts\Console\Kernel;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Tests\TestCase;
 
 /*
@@ -41,7 +43,18 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something(): void
+/**
+ * Run an artisan command through the kernel with a buffered output and return
+ * [exitCode, output]. Unlike the artisan() test double, this captures Laravel
+ * Prompts output (tables, notes), which is written to its own output stream.
+ *
+ * @param  array<string, mixed>  $parameters
+ * @return array{0: int, 1: string}
+ */
+function runCommand(string $command, array $parameters = []): array
 {
-    // ..
+    $buffer = new BufferedOutput;
+    $code = app(Kernel::class)->call($command, $parameters, $buffer);
+
+    return [$code, $buffer->fetch()];
 }

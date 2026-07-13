@@ -6,18 +6,75 @@ use App\Http\Integrations\Bitbucket\BitbucketConnector;
 use App\Http\Integrations\Bitbucket\Requests\NextPageRequest;
 use App\Support\CredentialStore;
 use App\Support\GitContext;
+use Illuminate\Contracts\Support\Arrayable;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
 use Symfony\Component\Process\Process;
 
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\password;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
+use function Laravel\Prompts\warning;
+
 /**
  * Base command for everything that talks to the Bitbucket API. Provides the
  * connector factory, credential guard, repo parsing, error handling and
  * pagination helpers shared by the concrete commands.
+ *
+ * All console I/O (tables, prompts, notifications) is routed through
+ * Laravel Prompts by overriding the framework's helpers below, so every
+ * command gets a consistent look without importing anything itself.
  */
 abstract class BitbucketCommand extends Command
 {
+    /**
+     * Render a table with Laravel Prompts.
+     *
+     * @param  Arrayable<int, mixed>|array<int, mixed>  $headers
+     * @param  Arrayable<int, mixed>|array<int, mixed>  $rows
+     */
+    public function table($headers = [], $rows = [], $tableStyle = 'default', array $columnStyles = []): void
+    {
+        table(
+            $headers instanceof Arrayable ? $headers->toArray() : $headers,
+            $rows instanceof Arrayable ? $rows->toArray() : $rows,
+        );
+    }
+
+    public function info($string, $verbosity = null): void
+    {
+        info($string);
+    }
+
+    public function warn($string, $verbosity = null): void
+    {
+        warning($string);
+    }
+
+    public function error($string, $verbosity = null): void
+    {
+        error($string);
+    }
+
+    public function confirm($question, $default = false): bool
+    {
+        return confirm(label: $question, default: $default);
+    }
+
+    public function ask($question, $default = null): mixed
+    {
+        return text(label: $question, default: (string) $default);
+    }
+
+    public function secret($question, $fallback = true): mixed
+    {
+        return password(label: $question);
+    }
+
     protected function credentials(): CredentialStore
     {
         return app(CredentialStore::class);

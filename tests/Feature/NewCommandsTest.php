@@ -68,7 +68,8 @@ it('lists pipelines', function () {
         ], 200),
     ]);
 
-    $this->artisan('pipeline:list --repo=acme/api')
-        ->expectsOutputToContain('SUCCESSFUL')
-        ->assertSuccessful();
+    [$code, $output] = runCommand('pipeline:list', ['--repo' => 'acme/api']);
+
+    expect($code)->toBe(0);
+    expect($output)->toContain('SUCCESSFUL');
 });
