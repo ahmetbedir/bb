@@ -1,5 +1,11 @@
 <?php
 
+use App\Kernel;
 use LaravelZero\Framework\Application;
 
-return Application::configure(basePath: dirname(__DIR__))->create();
+$app = Application::configure(basePath: dirname(__DIR__))
+    ->create();
+
+$app->singleton(Illuminate\Contracts\Console\Kernel::class, Kernel::class);
+
+return $app;
