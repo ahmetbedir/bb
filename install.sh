@@ -9,17 +9,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-PREFIX="${PREFIX:-~/.local/bin}"
+PREFIX="${PREFIX:-$HOME/.local/bin}"
+# Expand a leading ~ in case PREFIX was passed quoted (the shell won't).
+PREFIX="${PREFIX/#\~/$HOME}"
+echo "==> Installing bbcli to ${PREFIX}"
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo dev)}"
-
-echo "==> Installing dependencies (no dev)"
-composer install --no-dev --optimize-autoloader --quiet
 
 echo "==> Building bbcli ${VERSION}"
 php bbcli app:build bbcli --build-version="${VERSION}" --no-interaction >/dev/null
-
-echo "==> Restoring dev dependencies"
-composer install --quiet
 
 mkdir -p "${PREFIX}"
 TARGET="${PREFIX}/bbcli"
