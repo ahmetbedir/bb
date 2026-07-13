@@ -114,6 +114,30 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Parse an explicit positional repo argument ("workspace/repo" or bare
+     * "repo" + default workspace) into [workspace, slug]. Used by commands
+     * that always name their target (clone, create, fork, delete).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    protected function parseRepoArgument(string $repo): ?array
+    {
+        if (str_contains($repo, '/')) {
+            [$workspace, $slug] = explode('/', $repo, 2);
+
+            return [$workspace, $slug];
+        }
+
+        if (filled($workspace = $this->credentials()->get('workspace'))) {
+            return [$workspace, $repo];
+        }
+
+        $this->error("No workspace given. Use \"workspace/{$repo}\" or set a default with: bbcli configure");
+
+        return null;
+    }
+
+    /**
      * Whether the command was asked to emit machine-readable JSON.
      */
     protected function wantsJson(): bool
@@ -261,10 +285,43 @@ abstract class BitbucketCommand extends Command
         }
     }
 
+    /**
+     * The bearer token for the active auth method, if any.
+     */
+    protected function bearerToken(): ?string
+    {
+        $store = $this->credentials();
+
+        return match ($store->get('method')) {
+            'token' => (string) $store->get('token'),
+            'oauth' => (string) $store->get('oauth.access_token'),
+            default => null,
+        };
+    }
+
+    /**
+     * The [username, password] pair git should use for HTTPS operations.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    protected function gitCredentials(): ?array
+    {
+        $store = $this->credentials();
+
+        return match ($store->get('method')) {
+            'app_password' => [(string) $store->get('username'), (string) $store->get('app_password')],
+            'token' => ['x-token-auth', (string) $store->get('token')],
+            'oauth' => ['x-token-auth', (string) $store->get('oauth.access_token')],
+            default => null,
+        };
+    }
+
     protected function reportApiError(Response $response): void
     {
-        $body = $response->json();
-        $message = data_get($body, 'error.message', $response->body() ?: 'Unknown error');
+        $body = json_decode($response->body(), true);
+        $message = is_array($body)
+            ? data_get($body, 'error.message', $response->body())
+            : ($response->body() ?: 'Unknown error');
 
         $this->error("Bitbucket API [{$response->status()}]: {$message}");
     }
