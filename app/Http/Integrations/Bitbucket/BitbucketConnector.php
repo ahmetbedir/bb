@@ -2,6 +2,10 @@
 
 namespace App\Http\Integrations\Bitbucket;
 
+use App\Support\CredentialStore;
+use Saloon\Contracts\Authenticator;
+use Saloon\Http\Auth\BasicAuthenticator;
+use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
 use Saloon\Traits\Plugins\AcceptsJson;
 
@@ -9,27 +13,47 @@ class BitbucketConnector extends Connector
 {
     use AcceptsJson;
 
+    public function __construct(protected CredentialStore $credentials) {}
+
     /**
-     * The Base URL of the API
+     * The Base URL of the Bitbucket Cloud REST API (v2).
      */
     public function resolveBaseUrl(): string
     {
-        return '';
+        return rtrim(
+            $this->credentials->get('base_url', 'https://api.bitbucket.org/2.0'),
+            '/'
+        );
     }
 
     /**
-     * Default headers for every request
+     * Authenticate every request using the configured credentials.
      */
+    protected function defaultAuth(): ?Authenticator
+    {
+        return match ($this->credentials->get('method')) {
+            'app_password' => new BasicAuthenticator(
+                (string) $this->credentials->get('username'),
+                (string) $this->credentials->get('app_password'),
+            ),
+            'token' => new TokenAuthenticator(
+                (string) $this->credentials->get('token'),
+            ),
+            default => null,
+        };
+    }
+
     protected function defaultHeaders(): array
     {
-        return [];
+        return [
+            'Accept' => 'application/json',
+        ];
     }
 
-    /**
-     * Default HTTP client options
-     */
     protected function defaultConfig(): array
     {
-        return [];
+        return [
+            'timeout' => 30,
+        ];
     }
 }
