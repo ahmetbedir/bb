@@ -1,41 +1,174 @@
-<p align="center">
-    <img title="Laravel Zero" height="100" src="https://raw.githubusercontent.com/laravel-zero/docs/master/images/logo/laravel-zero-readme.png" alt="Laravel Zero Logo" />
-</p>
+# bbcli
 
-<p align="center">
-  <a href="https://github.com/laravel-zero/framework/actions"><img src="https://github.com/laravel-zero/laravel-zero/actions/workflows/tests.yml/badge.svg" alt="Build Status" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/dt/laravel-zero/framework.svg" alt="Total Downloads" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/v/laravel-zero/framework.svg?label=stable" alt="Latest Stable Version" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/l/laravel-zero/framework.svg" alt="License" /></a>
-</p>
+A `gh`-style command-line client for **Bitbucket Cloud**, built with
+[Laravel Zero](https://laravel-zero.com) and [Saloon](https://docs.saloon.dev).
 
-Laravel Zero was created by [Nuno Maduro](https://github.com/nunomaduro) and [Owen Voke](https://github.com/owenvoke), and is a micro-framework that provides an elegant starting point for your console application. It is an **unofficial** and customized version of Laravel optimized for building command-line applications.
+Manage repositories, pull requests, issues, branches and pipelines from your
+terminal — and let `git` push/pull over HTTPS using the same credentials.
 
-- Built on top of the [Laravel](https://laravel.com) components.
-- Optional installation of Laravel [Eloquent](https://laravel-zero.com/docs/database/), Laravel [Logging](https://laravel-zero.com/docs/logging/) and many others.
-- Supports interactive [menus](https://laravel-zero.com/docs/build-interactive-menus/) and [desktop notifications](https://laravel-zero.com/docs/send-desktop-notifications/) on Linux, Windows & MacOS.
-- Ships with a [Scheduler](https://laravel-zero.com/docs/task-scheduling/) and  a [Standalone Compiler](https://laravel-zero.com/docs/build-a-standalone-application/).
-- Integration with [Collision](https://github.com/nunomaduro/collision) - Beautiful error reporting
-- Follow the creator Nuno Maduro:
-    - YouTube: **[youtube.com/@nunomaduro](https://www.youtube.com/@nunomaduro)** — Videos every weekday
-    - Twitch: **[twitch.tv/enunomaduro](https://www.twitch.tv/enunomaduro)** — Streams (almost) every weekday
-    - Twitter / X: **[x.com/enunomaduro](https://x.com/enunomaduro)**
-    - LinkedIn: **[linkedin.com/in/nunomaduro](https://www.linkedin.com/in/nunomaduro)**
-    - Instagram: **[instagram.com/enunomaduro](https://www.instagram.com/enunomaduro)**
-    - Tiktok: **[tiktok.com/@enunomaduro](https://www.tiktok.com/@enunomaduro)**
+---
 
-------
+## Requirements
 
-## Documentation
+- PHP 8.2+
+- `git` on your PATH
+- `jq` on your PATH (optional — only for `--jq` filtering)
 
-For full documentation, visit [laravel-zero.com](https://laravel-zero.com/).
+## Install
 
-## Support the development
-**Do you like this project? Support it by donating**
+```bash
+./install.sh                        # builds a PHAR and installs to /usr/local/bin
+PREFIX=~/.local/bin ./install.sh    # install without sudo
+```
 
-- PayPal: [Donate](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=66BYDWAT92N6L)
-- Patreon: [Donate](https://www.patreon.com/nunomaduro)
+Or run from source during development:
+
+```bash
+composer install
+php bbcli <command>
+```
+
+## Authentication
+
+bbcli supports three auth methods. Pick one:
+
+### OAuth (browser) — recommended
+
+Create an OAuth consumer in **Workspace settings → OAuth consumers** with the
+callback URL `http://localhost:8888/callback`, then:
+
+```bash
+bbcli auth login
+```
+
+Tokens are refreshed automatically when they expire.
+
+### App password / API token
+
+```bash
+bbcli configure
+```
+
+- **App password**: username + an [app password](https://bitbucket.org/account/settings/app-passwords/).
+- **API / access token**: sent as a Bearer token.
+
+Credentials are stored in `~/.config/bbcli/config.json` (mode `0600`).
+
+### Check / clear
+
+```bash
+bbcli auth status
+bbcli auth logout
+```
+
+## Use git over HTTPS via bbcli
+
+Register bbcli as a git credential helper so `git push`/`git pull` authenticate
+transparently for `bitbucket.org`:
+
+```bash
+bbcli auth setup-git
+```
+
+## Selecting a repository
+
+Commands that act on a repo resolve it in this order (like `gh`):
+
+1. the `-R, --repo workspace/repo` flag
+2. the `origin` git remote of the current directory
+3. a bare slug + the default workspace set during `configure`
+
+```bash
+cd my-repo/          # inside a Bitbucket checkout
+bbcli pr:list        # repo detected from origin
+bbcli pr:list -R acme/other-repo
+```
+
+## Commands
+
+### Auth
+| Command | Description |
+|---|---|
+| `auth:login` | Log in via OAuth in the browser |
+| `auth:status` | Show current authentication status |
+| `auth:logout` | Remove stored credentials |
+| `auth:token` | Print the bearer token (for scripting) |
+| `auth:setup-git` | Configure git HTTPS auth via bbcli |
+
+### Repositories
+| Command | Description |
+|---|---|
+| `repo:list [workspace]` | List repositories |
+| `repo:show` | Show repository details (`--web`, `--json`) |
+| `repo:clone <repo> [dir]` | Clone with git (`--https`) |
+| `repo:create <repo>` | Create a repo (`--public`, `--project`, `--clone`) |
+| `repo:fork <repo>` | Fork a repo (`--into`, `--name`) |
+| `repo:delete <repo>` | Delete a repo (`--yes`) |
+
+### Pull requests
+| Command | Description |
+|---|---|
+| `pr:list` | List PRs (`--state`, `--json`) |
+| `pr:show <id>` | Show a PR (`--web`, `--json`) |
+| `pr:status` | PRs you authored / must review |
+| `pr:create` | Create a PR (`--title`, `--source`, `--dest`, `--web`) |
+| `pr:checkout <id>` | Check out a PR branch locally (fork-aware) |
+| `pr:diff <id>` | Show the PR diff (colorized) |
+| `pr:checks <id>` | Show CI / pipeline statuses |
+| `pr:comment <id>` | Add a comment (`--body`) |
+| `pr:approve <id>` | Approve |
+| `pr:request-changes <id>` | Request changes (`--body`) |
+| `pr:merge <id>` | Merge (`--strategy`, `--close-source-branch`) |
+| `pr:edit <id>` | Edit title/description/destination |
+| `pr:close <id>` | Decline a PR (`--yes`) |
+
+### Issues
+| Command | Description |
+|---|---|
+| `issue:list` | List issues (`--state`, `--json`) |
+| `issue:view <id>` | Show an issue (`--web`, `--json`) |
+| `issue:create` | Create an issue (`--title`, `--kind`, `--priority`) |
+| `issue:comment <id>` | Add a comment (`--body`) |
+| `issue:edit <id>` | Edit an issue |
+| `issue:close <id>` | Close an issue (`--state`) |
+
+### Branches
+| Command | Description |
+|---|---|
+| `branch:list` | List branches (`--json`) |
+| `branch:create [name]` | Create a branch (`--from`) |
+
+### Pipelines
+| Command | Description |
+|---|---|
+| `pipeline:list` | List recent pipelines (`--json`) |
+| `pipeline:view <uuid>` | Show a pipeline and its steps |
+
+### Other
+| Command | Description |
+|---|---|
+| `api <path>` | Authenticated raw API request (`-X`, `-f`, `--query`, `--input`, `--jq`) |
+| `configure` | Set up credentials interactively |
+| `completion <shell>` | Print a shell completion script |
+
+## Scripting
+
+Most read commands support `--json` for raw output and `--jq` to filter it:
+
+```bash
+bbcli repo:list acme --json --jq='.[].slug'
+bbcli pr:list -R acme/api --json --jq='.[] | select(.state=="OPEN") | .title'
+bbcli api /repositories/acme/api --jq='.mainbranch.name'
+```
+
+## Development
+
+```bash
+composer install
+vendor/bin/pest        # run the test suite
+vendor/bin/pint        # format code
+```
 
 ## License
 
-Laravel Zero is an open-source software licensed under the MIT license.
+MIT
