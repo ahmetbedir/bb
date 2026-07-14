@@ -9,6 +9,7 @@ class PrShowCommand extends BitbucketCommand
 {
     protected $signature = 'pr:show
         {id : Pull request id}
+        {--D|--with-description : Show the pull request description}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--web : Open the pull request in a browser instead of printing details}
         {--json : Output raw JSON}
@@ -61,7 +62,7 @@ class PrShowCommand extends BitbucketCommand
             ['Web', $pr['links']['html']['href'] ?? ''],
         ]);
 
-        if (filled($description = $pr['description'] ?? '')) {
+        if ($this->option('with-description') && filled($description = $pr['description'] ?? '')) {
             $this->newLine();
             $this->line('<comment>Description:</comment>');
             $this->line($description);
