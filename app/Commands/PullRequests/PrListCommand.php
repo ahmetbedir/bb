@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 class PrListCommand extends BitbucketCommand
 {
     protected $signature = 'pr:list
+        {branch? : Only list PRs whose source branch is this}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--state=OPEN : OPEN, MERGED, DECLINED or SUPERSEDED}
         {--limit=50 : Maximum number of pull requests to show}
@@ -30,14 +31,26 @@ class PrListCommand extends BitbucketCommand
 
         [$workspace, $slug] = $resolved;
         $state = strtoupper((string) $this->option('state'));
+        $branch = $this->argument('branch');
+
+        // When a branch is given, put both state and source branch into `q`
+        // (Bitbucket ignores the `state` param when `q` is present).
+        $filters = filled($branch)
+            ? ['q' => "state=\"{$state}\" AND source.branch.name=\"{$branch}\""]
+            : [];
 
         $prs = $this->collectAll(
-            new ListPullRequests($workspace, $slug, $state),
+            new ListPullRequests($workspace, $slug, $state, $filters),
             limit: (int) $this->option('limit'),
         );
 
         if ($prs === null) {
             return self::FAILURE;
+        }
+
+        // Defensively enforce the source-branch filter client-side too.
+        if (filled($branch)) {
+            $prs = array_values(array_filter($prs, fn ($pr) => data_get($pr, 'source.branch.name') === $branch));
         }
 
         if ($this->wantsJson()) {

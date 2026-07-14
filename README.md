@@ -118,19 +118,25 @@ bb pr:list -R acme/other-repo
 ### Pull requests
 | Command | Description |
 |---|---|
-| `pr:list` | List PRs (`--state`, `--json`) |
-| `pr:show <id>` | Show a PR (`--web`, `--json`) |
+| `pr:list [branch]` | List PRs (`--state`, `--json`); optional source-branch filter |
+| `pr:show [id]` | Show a PR (`--web`, `--json`) |
 | `pr:status` | PRs you authored / must review |
-| `pr:create` | Create a PR (`--title`, `--source`, `--dest`, `--web`) |
+| `pr:create` | Create a PR (`--title`, `--source`, `--dest`, `--fill`, `--web`) |
 | `pr:checkout <id>` | Check out a PR branch locally (fork-aware) |
-| `pr:diff <id>` | Show the PR diff (colorized) |
-| `pr:checks <id>` | Show CI / pipeline statuses |
+| `pr:diff [id]` | Show the PR diff (colorized, paged) |
+| `pr:files [id]` | List changed files (+/- per file) |
+| `pr:commits [id]` | List commits in the PR |
+| `pr:checks [id]` | Show CI / pipeline statuses (`--watch`) |
 | `pr:comment <id>` | Add a comment (`--body`) |
 | `pr:approve <id>` | Approve |
+| `pr:unapprove [id]` | Remove your approval |
 | `pr:request-changes <id>` | Request changes (`--body`) |
+| `pr:unrequest-changes [id]` | Remove your "request changes" |
 | `pr:merge <id>` | Merge (`--strategy`, `--close-source-branch`) |
 | `pr:edit <id>` | Edit title/description/destination |
 | `pr:close <id>` | Decline a PR (`--yes`) |
+
+Commands taking `[id]` default to the open PR for the current branch when no id is given.
 
 ### Issues
 | Command | Description |
@@ -145,7 +151,7 @@ bb pr:list -R acme/other-repo
 ### Branches
 | Command | Description |
 |---|---|
-| `branch:list` | List branches (`--json`) |
+| `branch:list` | List branches (`--name`, `--user`, `--json`) |
 | `branch:create [name]` | Create a branch (`--from`) |
 | `branch:delete <name>` | Delete a branch (`--yes`) |
 
@@ -160,6 +166,8 @@ bb pr:list -R acme/other-repo
 ### Other
 | Command | Description |
 |---|---|
+| `browse` | Open the repository's Bitbucket page in your browser |
+| `browse:show` | Print the repository URL without opening a browser |
 | `api <path>` | Authenticated raw API request (`-X`, `-f`, `--query`, `--input`, `--jq`) |
 | `configure` | Set up credentials interactively |
 | `config [key] [value]` | Get/set preferences (e.g. `config pager off`) |

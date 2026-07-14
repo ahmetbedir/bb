@@ -14,6 +14,11 @@ class NextPageRequest extends Request
 {
     protected Method $method = Method::GET;
 
+    // The "next" URL is a fully-qualified api.bitbucket.org link; allow it to
+    // override the connector base URL (Saloon blocks absolute endpoints by
+    // default as an SSRF guard).
+    public ?bool $allowBaseUrlOverride = true;
+
     public function __construct(protected string $url) {}
 
     public function resolveEndpoint(): string

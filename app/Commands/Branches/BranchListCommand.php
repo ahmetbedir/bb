@@ -12,7 +12,9 @@ class BranchListCommand extends BitbucketCommand
 {
     protected $signature = 'branch:list
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--q= : Bitbucket query filter, e.g. "name ~ \"feature\""}
+        {--name= : Only branches whose name contains this}
+        {--user= : Only branches whose latest commit author name contains this}
+        {--q= : Raw Bitbucket query filter, e.g. "name ~ \"feature\""}
         {--limit=50 : Maximum number of branches to show}
         {--json : Output raw JSON}
         {--jq= : Filter JSON output through a jq expression}';
@@ -31,10 +33,16 @@ class BranchListCommand extends BitbucketCommand
 
         [$workspace, $slug] = $resolved;
 
-        $filters = [];
+        // Filter by name server-side (Bitbucket "contains" operator ~).
+        $queries = [];
         if (filled($this->option('q'))) {
-            $filters['q'] = $this->option('q');
+            $queries[] = $this->option('q');
         }
+        if (filled($name = $this->option('name'))) {
+            $queries[] = 'name ~ "'.str_replace('"', '', $name).'"';
+        }
+
+        $filters = $queries === [] ? [] : ['q' => implode(' AND ', $queries)];
 
         $branches = $this->collectAll(
             new ListBranches($workspace, $slug, $filters),
@@ -43,6 +51,20 @@ class BranchListCommand extends BitbucketCommand
 
         if ($branches === null) {
             return self::FAILURE;
+        }
+
+        // Filter by latest-commit author client-side.
+        if (filled($user = $this->option('user'))) {
+            $needle = mb_strtolower($user);
+            $branches = array_values(array_filter($branches, function (array $b) use ($needle) {
+                $author = mb_strtolower(
+                    data_get($b, 'target.author.user.display_name')
+                    ?? data_get($b, 'target.author.raw')
+                    ?? ''
+                );
+
+                return str_contains($author, $needle);
+            }));
         }
 
         if ($this->wantsJson()) {
