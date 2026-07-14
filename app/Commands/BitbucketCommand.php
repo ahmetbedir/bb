@@ -20,6 +20,7 @@ use function Laravel\Prompts\error;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
+use function Termwind\parse;
 use function Termwind\render;
 
 /**
@@ -193,10 +194,10 @@ abstract class BitbucketCommand extends Command
         $label = trim("{$symbol} {$state}");
 
         return match ($kind) {
-            'ok' => "<bg=green;fg=black> {$label} </>",
-            'bad' => "<bg=red;fg=white> {$label} </>",
-            'warn' => "<bg=yellow;fg=black> {$label} </>",
-            default => "<options=bold> {$label} </>",
+            'ok' => parse('<span class="bg-green font-bold px-1 w-12"> '.e($label).' </span>'),
+            'bad' => parse('<span class="bg-red-600 font-bold px-1 w-12"> '.e($label).' </span>'),
+            'warn' => parse('<span class="bg-yellow-400 font-bold px-1 w-12"> '.e($label).' </span>'),
+            default => parse('<span class="bg-gray-500 font-bold px-1 w-12"> '.e($label).' </span>'),
         };
     }
 
