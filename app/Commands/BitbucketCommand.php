@@ -383,7 +383,7 @@ abstract class BitbucketCommand extends Command
             return $detected;
         }
 
-        $this->warn('No repository given and none detected from the current git remote. Pass "-R workspace/repo".');
+        $this->error('No repository given and none detected from the current git remote. Pass "-R workspace/repo".');
 
         return null;
     }
