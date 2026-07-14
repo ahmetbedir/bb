@@ -17,11 +17,10 @@ use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
+use function Termwind\render;
 
 /**
  * Base command for everything that talks to the Bitbucket API. Provides the
@@ -259,19 +258,24 @@ abstract class BitbucketCommand extends Command
         return rtrim(mb_substr($value, 0, max(1, $max - 1))).'…';
     }
 
+    protected function outputByType(string $message, string $type = 'info'): void
+    {
+        render(sprintf('<div class="output %s">%s</div>', e($type), e($message)));
+    }
+
     public function info($string, $verbosity = null): void
     {
-        info($string);
+        $this->outputByType($string, 'info');
     }
 
     public function warn($string, $verbosity = null): void
     {
-        warning($string);
+        $this->outputByType($string, 'warning');
     }
 
     public function error($string, $verbosity = null): void
     {
-        error($string);
+        $this->outputByType($string, 'error');
     }
 
     public function confirm($question, $default = false): bool
@@ -379,7 +383,7 @@ abstract class BitbucketCommand extends Command
             return $detected;
         }
 
-        $this->error('No repository given and none detected from the current git remote. Pass "-R workspace/repo".');
+        $this->warn('No repository given and none detected from the current git remote. Pass "-R workspace/repo".');
 
         return null;
     }
