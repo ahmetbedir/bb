@@ -6,16 +6,18 @@ class ConfigCommand extends BitbucketCommand
 {
     protected $signature = 'config
         {key? : Setting key (e.g. pager)}
-        {value? : New value; omit to read the current value}
+        {value?* : New value(s); omit to read the current value}
         {--unset : Remove the setting}';
 
-    protected $description = 'Get or set bb preferences (e.g. pager)';
+    protected $description = 'Get or set bb preferences (e.g. pager, destinations)';
 
     /**
      * Known settings and their descriptions (shown when listing).
      */
     private const KNOWN = [
         'pager' => 'auto|off — page long output through $PAGER/less',
+        'default_destination' => 'default destination branch pre-selected in pr:create',
+        'destinations' => 'destination branches offered in pr:create (comma/space separated)',
     ];
 
     public function handle(): int
@@ -46,11 +48,18 @@ class ConfigCommand extends BitbucketCommand
             return self::SUCCESS;
         }
 
-        if (blank($value = $this->argument('value'))) {
+        $value = implode(' ', (array) $this->argument('value'));
+
+        if (blank($value)) {
             $current = $store->get("settings.{$key}");
             $this->line($current === null ? '(unset)' : (string) $current);
 
             return self::SUCCESS;
+        }
+
+        // Normalise list-style values (comma or space separated) to "a, b, c".
+        if ($key === 'destinations') {
+            $value = implode(', ', array_values(array_filter(preg_split('/[\s,]+/', $value) ?: [])));
         }
 
         $store->set("settings.{$key}", $value)->save();

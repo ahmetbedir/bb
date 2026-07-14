@@ -17,6 +17,16 @@ it('sets and reads a setting', function () {
         ->assertSuccessful();
 });
 
+it('normalises destinations from space- or comma-separated input', function () {
+    $this->artisan('config', ['key' => 'destinations', 'value' => ['production', 'staging', 'develop']])
+        ->assertSuccessful();
+    expect($this->store->get('settings.destinations'))->toBe('production, staging, develop');
+
+    $this->artisan('config', ['key' => 'destinations', 'value' => ['main,release,hotfix']])
+        ->assertSuccessful();
+    expect($this->store->get('settings.destinations'))->toBe('main, release, hotfix');
+});
+
 it('unsets a setting', function () {
     $this->store->set('settings.pager', 'off')->save();
 

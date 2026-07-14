@@ -6,6 +6,7 @@ use App\Commands\BitbucketCommand;
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\CreatePullRequest;
 use App\Support\GitContext;
 
+use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 class PrCreateCommand extends BitbucketCommand
@@ -37,7 +38,23 @@ class PrCreateCommand extends BitbucketCommand
         $source = $this->option('source')
             ?: app(GitContext::class)->currentBranch()
             ?: text('Source branch', required: true);
-        $dest = $this->option('dest') ?: null;
+
+        // Ask for the destination when not given — a select box of the repo's
+        // branches, pre-selecting the configured default (or the main branch).
+        $dest = $this->option('dest');
+        if (blank($dest)) {
+            $dest = $this->promptDestination($source);
+        }
+
+        if (blank($dest)) {
+            return self::FAILURE;
+        }
+
+        if ($source === $dest) {
+            $this->error("Source and destination are both \"{$source}\" — choose a different destination branch.");
+
+            return self::FAILURE;
+        }
 
         [$filledTitle, $filledBody] = $this->option('fill') ? $this->fillFromCommits($dest) : [null, null];
 
@@ -68,6 +85,47 @@ class PrCreateCommand extends BitbucketCommand
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Prompt for the destination branch. Uses the branches configured via
+     * `bb config destinations ...` as a select box; falls back to free text.
+     */
+    private function promptDestination(string $source): ?string
+    {
+        $options = array_values(array_filter(
+            $this->configuredDestinations(),
+            fn ($b) => $b !== $source,
+        ));
+
+        $default = $this->credentials()->get('settings.default_destination') ?: ($options[0] ?? null);
+
+        if ($options === []) {
+            return text('Destination branch', default: (string) $default, required: true);
+        }
+
+        if (blank($default) || ! in_array($default, $options, true)) {
+            $default = $options[0];
+        }
+
+        return select(
+            label: 'Destination branch',
+            options: $options,
+            default: $default,
+            scroll: 15,
+        );
+    }
+
+    /**
+     * Destination branches configured via `bb config destinations ...`.
+     *
+     * @return array<int, string>
+     */
+    private function configuredDestinations(): array
+    {
+        $raw = (string) $this->credentials()->get('settings.destinations', '');
+
+        return array_values(array_filter(preg_split('/[\s,]+/', $raw) ?: []));
     }
 
     /**
