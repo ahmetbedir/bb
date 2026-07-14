@@ -425,22 +425,37 @@ abstract class BitbucketCommand extends Command
             return null;
         }
 
+        // Bitbucket ignores the `state` query param when `q` is present, so the
+        // state must be expressed inside `q` — otherwise MERGED/DECLINED PRs
+        // for this branch come back too.
         $response = $this->send(new ListPullRequests(
             $workspace,
             $slug,
             'OPEN',
-            ['q' => "source.branch.name=\"{$branch}\""],
+            ['q' => "state=\"OPEN\" AND source.branch.name=\"{$branch}\""],
         ));
 
-        $found = $response?->json('values.0.id');
+        if ($response === null) {
+            return null;
+        }
 
-        if (blank($found)) {
-            $this->error("No open pull request found for branch \"{$branch}\".");
+        // Verify both the state and source branch client-side — never fall back
+        // to an unrelated or already-merged PR.
+        $match = collect($response->json('values') ?? [])
+            ->first(fn ($pr) => data_get($pr, 'source.branch.name') === $branch
+                && data_get($pr, 'state') === 'OPEN');
+
+        if ($match === null) {
+            $this->error("No open pull request found for branch \"{$branch}\". Pass a PR id explicitly.");
 
             return null;
         }
 
-        return $found;
+        // Be explicit about which PR was auto-resolved — to STDERR so it never
+        // pollutes stdout (JSON output, a piped diff, etc).
+        fwrite(STDERR, "Using PR #{$match['id']} (source branch \"{$branch}\")".PHP_EOL);
+
+        return $match['id'];
     }
 
     /**
