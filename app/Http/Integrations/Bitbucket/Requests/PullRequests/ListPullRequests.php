@@ -11,11 +11,13 @@ class ListPullRequests extends Request
 
     /**
      * @param  string|array<int, string>  $state  e.g. OPEN, MERGED, DECLINED, SUPERSEDED
+     * @param  array<string, mixed>  $filters  extra query params (e.g. ['q' => '...'])
      */
     public function __construct(
         protected string $workspace,
         protected string $repoSlug,
         protected string|array $state = 'OPEN',
+        protected array $filters = [],
     ) {}
 
     public function resolveEndpoint(): string
@@ -25,9 +27,9 @@ class ListPullRequests extends Request
 
     protected function defaultQuery(): array
     {
-        return [
+        return array_merge([
             'state' => $this->state,
             'pagelen' => 50,
-        ];
+        ], $this->filters);
     }
 }

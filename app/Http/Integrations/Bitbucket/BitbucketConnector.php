@@ -8,6 +8,8 @@ use Saloon\Helpers\OAuth2\OAuthConfig;
 use Saloon\Http\Auth\BasicAuthenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
+use Saloon\Http\PendingRequest;
+use Saloon\Http\Response;
 use Saloon\Traits\OAuth2\AuthorizationCodeGrant;
 use Saloon\Traits\Plugins\AcceptsJson;
 
@@ -16,7 +18,20 @@ class BitbucketConnector extends Connector
     use AcceptsJson;
     use AuthorizationCodeGrant;
 
-    public function __construct(protected CredentialStore $credentials) {}
+    public function __construct(protected CredentialStore $credentials)
+    {
+        // BB_DEBUG=1 traces every request/response to STDERR.
+        if (getenv('BB_DEBUG')) {
+            $this->middleware()->onRequest(function (PendingRequest $request) {
+                fwrite(STDERR, '→ '.$request->getMethod()->value.' '.$request->getUrl().PHP_EOL);
+            });
+            $this->middleware()->onResponse(function (Response $response) {
+                fwrite(STDERR, '← '.$response->status().' '.$response->getPendingRequest()->getUrl().PHP_EOL);
+
+                return $response;
+            });
+        }
+    }
 
     /**
      * The Base URL of the Bitbucket Cloud REST API (v2).

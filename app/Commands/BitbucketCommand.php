@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Http\Integrations\Bitbucket\BitbucketConnector;
 use App\Http\Integrations\Bitbucket\Requests\NextPageRequest;
+use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequests;
 use App\Support\CredentialStore;
 use App\Support\GitContext;
 use Illuminate\Contracts\Support\Arrayable;
@@ -407,6 +408,42 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Resolve a pull request id — either the explicit argument, or the open
+     * PR for the current git branch (gh-style "operate on the current PR").
+     */
+    protected function resolvePrId(string $workspace, string $slug, int|string|null $id): int|string|null
+    {
+        if (filled($id)) {
+            return $id;
+        }
+
+        $branch = app(GitContext::class)->currentBranch();
+
+        if (blank($branch)) {
+            $this->error('No pull request id given and no current git branch to detect one from.');
+
+            return null;
+        }
+
+        $response = $this->send(new ListPullRequests(
+            $workspace,
+            $slug,
+            'OPEN',
+            ['q' => "source.branch.name=\"{$branch}\""],
+        ));
+
+        $found = $response?->json('values.0.id');
+
+        if (blank($found)) {
+            $this->error("No open pull request found for branch \"{$branch}\".");
+
+            return null;
+        }
+
+        return $found;
+    }
+
+    /**
      * Whether the command was asked to emit machine-readable JSON.
      */
     protected function wantsJson(): bool
@@ -442,6 +479,68 @@ abstract class BitbucketCommand extends Command
         $this->output->write($process->getOutput());
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Write content through a pager ($BB_PAGER / $PAGER / less) when attached
+     * to a terminal and the content is taller than the window. Controlled by
+     * the "pager" setting (auto|off). Falls back to a plain write.
+     */
+    protected function pager(string $content): void
+    {
+        $setting = $this->credentials()->get('settings.pager', 'auto');
+        $height = (new Terminal)->getHeight() ?: 24;
+        $tall = substr_count($content, "\n") >= $height;
+
+        if ($setting === 'off' || ! stream_isatty(STDOUT) || ! $tall) {
+            $this->output->write($content);
+
+            return;
+        }
+
+        // The pager receives raw bytes, so render Symfony <markup> to ANSI
+        // first — otherwise less would print the literal tags.
+        $rendered = $this->output->getFormatter()->format($content);
+
+        $pager = getenv('BB_PAGER') ?: getenv('PAGER') ?: 'less -R';
+
+        // less reads the content from its stdin and the keyboard from /dev/tty,
+        // while inheriting our real stdout so it can draw to the terminal.
+        $process = proc_open($pager, [0 => ['pipe', 'r'], 1 => STDOUT, 2 => STDERR], $pipes);
+
+        if (! is_resource($process)) {
+            $this->output->write($content);
+
+            return;
+        }
+
+        fwrite($pipes[0], (string) $rendered);
+        fclose($pipes[0]);
+        proc_close($process);
+    }
+
+    /**
+     * Fire a desktop notification (best effort; silently ignored if the
+     * platform tool is unavailable).
+     */
+    protected function notify(string $title, string $message): void
+    {
+        $title = str_replace('"', "'", $title);
+        $message = str_replace('"', "'", $message);
+
+        try {
+            $command = match (PHP_OS_FAMILY) {
+                'Darwin' => 'osascript -e '.escapeshellarg("display notification \"{$message}\" with title \"{$title}\""),
+                'Linux' => 'notify-send '.escapeshellarg($title).' '.escapeshellarg($message),
+                default => null,
+            };
+
+            if ($command !== null) {
+                Process::fromShellCommandline($command)->run();
+            }
+        } catch (\Throwable) {
+            // Notifications are best-effort.
+        }
     }
 
     /**
@@ -490,13 +589,24 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Run a git command and return its trimmed stdout (null on failure).
+     */
+    protected function gitOutput(array $args, ?string $cwd = null): ?string
+    {
+        $process = new Process(['git', ...$args], $cwd);
+        $process->run();
+
+        return $process->isSuccessful() ? trim($process->getOutput()) : null;
+    }
+
+    /**
      * Send a request and surface Bitbucket errors in a friendly way.
      * Returns null when the request failed (message already printed).
      */
     protected function send(Request $request): ?Response
     {
         try {
-            $response = $this->connector()->send($request);
+            $response = $this->dispatch($this->connector(), $request);
         } catch (\Throwable $e) {
             $this->error('Request failed: '.$e->getMessage());
 
@@ -513,6 +623,28 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Send a request, transparently backing off and retrying on HTTP 429
+     * (rate limited), honouring the Retry-After header when present.
+     */
+    protected function dispatch(BitbucketConnector $connector, Request $request, int $maxRetries = 3): Response
+    {
+        $attempt = 0;
+
+        while (true) {
+            $response = $connector->send($request);
+
+            if ($response->status() !== 429 || $attempt >= $maxRetries) {
+                return $response;
+            }
+
+            $attempt++;
+            $wait = min(60, max(1, (int) ($response->header('Retry-After') ?: 2 ** $attempt)));
+            $this->warn("Rate limited by Bitbucket — retrying in {$wait}s ({$attempt}/{$maxRetries})...");
+            sleep($wait);
+        }
+    }
+
+    /**
      * Follow Bitbucket's cursor pagination, collecting every "values" entry.
      *
      * @return array<int, array<string, mixed>>|null
@@ -523,7 +655,7 @@ abstract class BitbucketCommand extends Command
         $values = [];
 
         try {
-            $response = $connector->send($request);
+            $response = $this->dispatch($connector, $request);
 
             while (true) {
                 if ($response->failed()) {
@@ -545,7 +677,7 @@ abstract class BitbucketCommand extends Command
                     return $values;
                 }
 
-                $response = $connector->send(new NextPageRequest($next));
+                $response = $this->dispatch($connector, new NextPageRequest($next));
             }
         } catch (\Throwable $e) {
             $this->error('Request failed: '.$e->getMessage());
@@ -593,5 +725,9 @@ abstract class BitbucketCommand extends Command
             : ($response->body() ?: 'Unknown error');
 
         $this->error("Bitbucket API [{$response->status()}]: {$message}");
+
+        if ($response->status() === 401) {
+            $this->warn('Your credentials were rejected. Run "bb auth login" or "bb configure" to re-authenticate.');
+        }
     }
 }

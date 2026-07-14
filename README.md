@@ -162,7 +162,19 @@ bb pr:list -R acme/other-repo
 |---|---|
 | `api <path>` | Authenticated raw API request (`-X`, `-f`, `--query`, `--input`, `--jq`) |
 | `configure` | Set up credentials interactively |
+| `config [key] [value]` | Get/set preferences (e.g. `config pager off`) |
+| `alias [name] [expansion]` | Manage command aliases (e.g. `alias co pr:checkout`) |
 | `completion <shell>` | Print a shell completion script |
+
+## Quality-of-life
+
+- **Current-branch PRs** — `pr:show`, `pr:diff`, `pr:checks` work with no id inside a checkout; they resolve the open PR for the current branch.
+- **`pr:create --fill`** — fills title/description from the branch commits.
+- **Watch + notify** — `pipeline:watch [uuid]` and `pr:checks --watch` poll until done and fire a desktop notification.
+- **Aliases** — `bb alias co pr:checkout`, then `bb co 42`.
+- **Pager** — long `pr:diff` output is paged through `$PAGER`/less on a TTY (disable with `bb config pager off`).
+- **Rate limits** — HTTP 429 responses are retried with backoff (honouring `Retry-After`).
+- **`BB_DEBUG=1`** — trace every request/response to stderr.
 
 ## Scripting
 

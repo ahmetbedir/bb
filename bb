@@ -17,6 +17,14 @@ define('LARAVEL_START', microtime(true));
 
 $autoloader = require file_exists(__DIR__.'/vendor/autoload.php') ?  __DIR__.'/vendor/autoload.php' : __DIR__.'/../../autoload.php';
 
+/*
+| Expand user-defined command aliases (bb alias ...) before Symfony parses argv.
+*/
+$_SERVER['argv'] = App\Support\AliasExpander::expand(
+    $_SERVER['argv'] ?? [],
+    (array) (new App\Support\CredentialStore)->get('aliases', []),
+);
+
 $app = require_once __DIR__.'/bootstrap/app.php';
 
 /*

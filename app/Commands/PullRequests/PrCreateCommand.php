@@ -16,6 +16,7 @@ class PrCreateCommand extends BitbucketCommand
         {--source= : Source branch name (defaults to the current git branch)}
         {--dest= : Destination branch name (defaults to the main branch)}
         {--description= : Pull request description}
+        {--fill : Fill title and description from the branch commits}
         {--close-source-branch : Close the source branch after merge}
         {--web : Open the created pull request in a browser}';
 
@@ -33,12 +34,15 @@ class PrCreateCommand extends BitbucketCommand
 
         [$workspace, $slug] = $resolved;
 
-        $title = $this->option('title') ?: text('Title', required: true);
         $source = $this->option('source')
             ?: app(GitContext::class)->currentBranch()
             ?: text('Source branch', required: true);
         $dest = $this->option('dest') ?: null;
-        $description = $this->option('description') ?: null;
+
+        [$filledTitle, $filledBody] = $this->option('fill') ? $this->fillFromCommits($dest) : [null, null];
+
+        $title = $this->option('title') ?: $filledTitle ?: text('Title', required: true);
+        $description = $this->option('description') ?: $filledBody;
 
         $response = $this->send(new CreatePullRequest(
             workspace: $workspace,
@@ -64,5 +68,40 @@ class PrCreateCommand extends BitbucketCommand
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Derive [title, description] from the commits on the current branch that
+     * are not yet on the destination branch (like `gh pr create --fill`).
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function fillFromCommits(?string $dest): array
+    {
+        $base = $dest
+            ? "origin/{$dest}"
+            : ($this->gitOutput(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']) ?: 'origin/main');
+
+        $log = $this->gitOutput(['log', '--format=%s', "{$base}..HEAD"]);
+        $subjects = $log ? array_values(array_filter(explode("\n", $log))) : [];
+
+        if (count($subjects) === 1) {
+            $body = $this->gitOutput(['log', '-1', '--format=%b']);
+
+            return [$subjects[0], filled($body) ? $body : null];
+        }
+
+        if (count($subjects) > 1) {
+            $branch = $this->gitOutput(['rev-parse', '--abbrev-ref', 'HEAD']) ?: $subjects[0];
+            $body = collect($subjects)->map(fn (string $s) => "- {$s}")->implode("\n");
+
+            return [$branch, $body];
+        }
+
+        // No range available — fall back to the latest commit.
+        $subject = $this->gitOutput(['log', '-1', '--format=%s']);
+        $body = $this->gitOutput(['log', '-1', '--format=%b']);
+
+        return [$subject ?: null, filled($body) ? $body : null];
     }
 }

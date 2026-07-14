@@ -8,8 +8,10 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequestStatuse
 class PrChecksCommand extends BitbucketCommand
 {
     protected $signature = 'pr:checks
-        {id : Pull request id}
+        {id? : Pull request id (defaults to the PR for the current branch)}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--watch : Poll until all checks finish, then notify}
+        {--interval=10 : Seconds between polls when watching}
         {--json : Output raw JSON}
         {--jq= : Filter JSON output through a jq expression}';
 
@@ -26,7 +28,14 @@ class PrChecksCommand extends BitbucketCommand
         }
 
         [$workspace, $slug] = $resolved;
-        $id = $this->argument('id');
+
+        if (blank($id = $this->resolvePrId($workspace, $slug, $this->argument('id')))) {
+            return self::FAILURE;
+        }
+
+        if ($this->option('watch') && ! $this->wantsJson()) {
+            $this->waitForChecks($workspace, $slug, $id);
+        }
 
         $statuses = $this->collectAll(new ListPullRequestStatuses($workspace, $slug, $id));
 
@@ -57,5 +66,33 @@ class PrChecksCommand extends BitbucketCommand
         $failed = collect($statuses)->contains(fn ($s) => ($s['state'] ?? '') === 'FAILED');
 
         return $failed ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Poll until no check is still INPROGRESS, then fire a notification.
+     */
+    private function waitForChecks(string $workspace, string $slug, int|string $id): void
+    {
+        $interval = max(3, (int) $this->option('interval'));
+
+        while (true) {
+            $statuses = $this->collectAll(new ListPullRequestStatuses($workspace, $slug, $id));
+
+            if (blank($statuses)) {
+                return;
+            }
+
+            $pending = collect($statuses)->filter(fn ($s) => ($s['state'] ?? '') === 'INPROGRESS')->count();
+
+            if ($pending === 0) {
+                $failed = collect($statuses)->contains(fn ($s) => ($s['state'] ?? '') === 'FAILED');
+                $this->notify("PR #{$id} checks", $failed ? 'A check failed' : 'All checks passed');
+
+                return;
+            }
+
+            $this->line("  {$pending} check(s) still running for PR #{$id} — polling every {$interval}s...");
+            sleep($interval);
+        }
     }
 }

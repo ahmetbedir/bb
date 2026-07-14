@@ -8,7 +8,7 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\GetPullRequest;
 class PrShowCommand extends BitbucketCommand
 {
     protected $signature = 'pr:show
-        {id : Pull request id}
+        {id? : Pull request id (defaults to the PR for the current branch)}
         {--D|--with-description : Show the pull request description}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--web : Open the pull request in a browser instead of printing details}
@@ -28,7 +28,10 @@ class PrShowCommand extends BitbucketCommand
         }
 
         [$workspace, $slug] = $resolved;
-        $id = $this->argument('id');
+
+        if (blank($id = $this->resolvePrId($workspace, $slug, $this->argument('id')))) {
+            return self::FAILURE;
+        }
 
         if ($this->option('web')) {
             $this->openInBrowser("https://bitbucket.org/{$workspace}/{$slug}/pull-requests/{$id}");

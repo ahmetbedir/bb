@@ -9,7 +9,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
 class PrDiffCommand extends BitbucketCommand
 {
     protected $signature = 'pr:diff
-        {id : Pull request id}
+        {id? : Pull request id (defaults to the PR for the current branch)}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}';
 
     protected $description = 'Show the diff for a pull request';
@@ -26,13 +26,17 @@ class PrDiffCommand extends BitbucketCommand
 
         [$workspace, $slug] = $resolved;
 
-        $response = $this->send(new GetPullRequestDiff($workspace, $slug, $this->argument('id')));
+        if (blank($id = $this->resolvePrId($workspace, $slug, $this->argument('id')))) {
+            return self::FAILURE;
+        }
+
+        $response = $this->send(new GetPullRequestDiff($workspace, $slug, $id));
 
         if ($response === null) {
             return self::FAILURE;
         }
 
-        $this->output->write($this->colorizeDiff($response->body()));
+        $this->pager($this->colorizeDiff($response->body()));
 
         return self::SUCCESS;
     }
