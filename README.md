@@ -102,8 +102,18 @@ bb pr:list -R acme/other-repo
 | `repo:show` | Show repository details (`--web`, `--json`) |
 | `repo:clone <repo> [dir]` | Clone with git (`--https`) |
 | `repo:create <repo>` | Create a repo (`--public`, `--project`, `--clone`) |
+| `repo:edit <repo>` | Edit settings (`--description`, `--name`, `--project`, `--private/--public`) |
 | `repo:fork <repo>` | Fork a repo (`--into`, `--name`) |
 | `repo:delete <repo>` | Delete a repo (`--yes`) |
+
+### Workspaces, projects, commits, tags
+| Command | Description |
+|---|---|
+| `workspace:list` | List workspaces you belong to |
+| `project:list [workspace]` | List projects in a workspace |
+| `commit:list [revision]` | List commits (`--limit`, `--json`) |
+| `tag:list` | List tags |
+| `tag:create [name]` | Create a tag (`--target`) |
 
 ### Pull requests
 | Command | Description |
@@ -137,12 +147,15 @@ bb pr:list -R acme/other-repo
 |---|---|
 | `branch:list` | List branches (`--json`) |
 | `branch:create [name]` | Create a branch (`--from`) |
+| `branch:delete <name>` | Delete a branch (`--yes`) |
 
 ### Pipelines
 | Command | Description |
 |---|---|
 | `pipeline:list` | List recent pipelines (`--json`) |
 | `pipeline:view <uuid>` | Show a pipeline and its steps |
+| `pipeline:run` | Trigger a run (`--branch`, `--pattern`) |
+| `pipeline:stop <uuid>` | Stop a running pipeline |
 
 ### Other
 | Command | Description |
