@@ -11,6 +11,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Terminal;
 use Symfony\Component\Process\Process;
 
@@ -494,6 +495,27 @@ abstract class BitbucketCommand extends Command
         $this->output->write($process->getOutput());
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Colourise a unified diff with Symfony markup (green adds, red removes,
+     * cyan hunks, bold headers). Non-diff lines are escaped so they can't be
+     * interpreted as markup.
+     */
+    protected function colorizeDiff(string $diff): string
+    {
+        return collect(explode("\n", $diff))
+            ->map(function (string $line) {
+                return match (true) {
+                    str_starts_with($line, '+++'), str_starts_with($line, '---') => "<options=bold>{$line}</>",
+                    str_starts_with($line, '@@') => "<fg=cyan>{$line}</>",
+                    str_starts_with($line, '+') => "<fg=green>{$line}</>",
+                    str_starts_with($line, '-') => "<fg=red>{$line}</>",
+                    str_starts_with($line, 'diff ') => "<options=bold>{$line}</>",
+                    default => OutputFormatter::escape($line),
+                };
+            })
+            ->implode("\n")."\n";
     }
 
     /**
