@@ -6,6 +6,8 @@ use App\Commands\BitbucketCommand;
 use App\Http\Integrations\Bitbucket\Requests\Branches\ListBranches;
 use Illuminate\Support\Str;
 
+use function Termwind\terminal;
+
 class BranchListCommand extends BitbucketCommand
 {
     protected $signature = 'branch:list
@@ -58,7 +60,7 @@ class BranchListCommand extends BitbucketCommand
             array_map(fn (array $b) => [
                 $this->link(
                     isset($b['name']) ? $this->repoWebUrl($workspace, $slug).'/branch/'.$b['name'] : null,
-                    Str::limit($b['name'] ?? '', 40),
+                    Str::limit($b['name'] ?? '', terminal()->width() / 2),
                 ),
                 $this->link(
                     isset($b['target']['hash']) ? $this->repoWebUrl($workspace, $slug).'/commits/'.$b['target']['hash'] : null,
