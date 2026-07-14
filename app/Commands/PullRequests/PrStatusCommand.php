@@ -83,7 +83,8 @@ class PrStatusCommand extends BitbucketCommand
             $id = $pr['id'] ?? '?';
             $prtitle = Str::limit($pr['title'] ?? '', 60);
             $branch = $pr['source']['branch']['name'] ?? '';
-            $this->line("  <fg=green>#{$id}</> {$prtitle} <fg=gray>[{$branch}]</>");
+            $number = $this->link($pr['links']['html']['href'] ?? null, "#{$id}");
+            $this->line("  <fg=green>{$number}</> {$prtitle} <fg=gray>[{$branch}]</>");
         }
     }
 }

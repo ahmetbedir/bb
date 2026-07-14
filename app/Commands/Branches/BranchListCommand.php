@@ -56,8 +56,14 @@ class BranchListCommand extends BitbucketCommand
         $this->table(
             ['Name', 'Last commit', 'Author', 'Date'],
             array_map(fn (array $b) => [
-                $b['name'] ?? '',
-                substr($b['target']['hash'] ?? '', 0, 8),
+                $this->link(
+                    isset($b['name']) ? $this->repoWebUrl($workspace, $slug).'/branch/'.$b['name'] : null,
+                    Str::limit($b['name'] ?? '', 40),
+                ),
+                $this->link(
+                    isset($b['target']['hash']) ? $this->repoWebUrl($workspace, $slug).'/commits/'.$b['target']['hash'] : null,
+                    substr($b['target']['hash'] ?? '', 0, 8),
+                ),
                 Str::limit($b['target']['author']['user']['display_name']
                     ?? $b['target']['author']['raw']
                     ?? '', 30),

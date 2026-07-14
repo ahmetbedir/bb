@@ -74,8 +74,7 @@ abstract class BitbucketCommand extends Command
             return [$headers, $rows];
         }
 
-        $strip = fn ($value): string => preg_replace('/<[^>]+>/', '', (string) $value) ?? '';
-        $measure = fn ($value): int => mb_strwidth($strip($value));
+        $measure = fn ($value): int => mb_strwidth($this->stripFormatting((string) $value));
 
         // Prompts renders " │ " between cells: 3 chars per column + the outer
         // border and a leading space. Keep a couple of chars of head-room.
@@ -91,8 +90,8 @@ abstract class BitbucketCommand extends Command
         foreach ($rows as $row) {
             foreach (array_values($row) as $i => $cell) {
                 $natural[$i] = max($natural[$i] ?? 0, $measure($cell));
-                if (str_contains((string) $cell, '<')) {
-                    $fixed[$i] = true; // contains markup — never truncate
+                if (str_contains((string) $cell, '<') || str_contains((string) $cell, "\033")) {
+                    $fixed[$i] = true; // contains markup or a hyperlink — never truncate
                 }
             }
         }
@@ -128,11 +127,52 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Wrap text in an OSC 8 terminal hyperlink (Ctrl/Cmd+Click opens it).
+     * Emits the raw escape sequence — Laravel Prompts renders <fg> markup but
+     * ignores Symfony's <href>, whereas the raw sequence passes through and
+     * stays aligned (Prompts excludes escapes from its width calculation).
+     * Falls back to plain text when no URL is available.
+     */
+    protected function link(?string $url, string|int $text): string
+    {
+        $text = (string) $text;
+
+        if (blank($url)) {
+            return $text;
+        }
+
+        $esc = "\033";
+
+        return "{$esc}]8;;{$url}{$esc}\\{$text}{$esc}]8;;{$esc}\\";
+    }
+
+    /**
+     * Strip Symfony <tags>, ANSI colours and OSC 8 hyperlinks for width maths.
+     */
+    protected function stripFormatting(string $value): string
+    {
+        $value = preg_replace('/\x1b\]8;;.*?\x1b\\\\/', '', $value) ?? $value; // OSC 8 links
+        $value = preg_replace('/\x1b\[[0-9;]*m/', '', $value) ?? $value;        // ANSI colours
+        $value = preg_replace('/<[^>]+>/', '', $value) ?? $value;              // Symfony tags
+
+        return $value;
+    }
+
+    /**
+     * The bitbucket.org web URL for a repository.
+     */
+    protected function repoWebUrl(string $workspace, string $slug): string
+    {
+        return "https://bitbucket.org/{$workspace}/{$slug}";
+    }
+
+    /**
      * Truncate a single cell to a visible width, leaving markup cells alone.
      */
     protected function truncateCell(string $value, int $max): string
     {
-        if (str_contains($value, '<') || mb_strwidth($value) <= $max) {
+        // Leave formatted cells (colours / hyperlinks) intact.
+        if (str_contains($value, '<') || str_contains($value, "\033") || mb_strwidth($value) <= $max) {
             return $value;
         }
 

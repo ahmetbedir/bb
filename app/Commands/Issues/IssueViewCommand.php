@@ -48,7 +48,7 @@ class IssueViewCommand extends BitbucketCommand
         }
 
         $this->table([], [
-            ['#', $issue['id'] ?? ''],
+            ['#', $this->link($issue['links']['html']['href'] ?? null, $issue['id'] ?? '')],
             ['Title', $issue['title'] ?? ''],
             ['State', $issue['state'] ?? ''],
             ['Kind', $issue['kind'] ?? ''],

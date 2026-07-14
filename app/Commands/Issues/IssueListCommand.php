@@ -56,7 +56,7 @@ class IssueListCommand extends BitbucketCommand
         $this->table(
             ['#', 'Title', 'Kind', 'Priority', 'State', 'Assignee', 'Updated'],
             array_map(fn (array $i) => [
-                $i['id'] ?? '',
+                $this->link($i['links']['html']['href'] ?? null, $i['id'] ?? ''),
                 Str::limit($i['title'] ?? '', 40),
                 $i['kind'] ?? '',
                 $i['priority'] ?? '',

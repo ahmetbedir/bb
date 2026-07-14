@@ -50,7 +50,10 @@ class PipelineListCommand extends BitbucketCommand
         $this->table(
             ['#', 'Status', 'Ref', 'Trigger', 'Created'],
             array_map(fn (array $p) => [
-                $p['build_number'] ?? '',
+                $this->link(
+                    isset($p['build_number']) ? $this->repoWebUrl($workspace, $slug)."/pipelines/results/{$p['build_number']}" : null,
+                    $p['build_number'] ?? '',
+                ),
                 $this->pipelineStatus($p),
                 Str::limit($p['target']['ref_name'] ?? ($p['target']['commit']['hash'] ?? ''), 24),
                 $p['trigger']['name'] ?? '',

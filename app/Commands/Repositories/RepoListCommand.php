@@ -58,7 +58,7 @@ class RepoListCommand extends BitbucketCommand
             ['Name', 'Slug', 'Private', 'Updated', 'Language'],
             array_map(fn (array $r) => [
                 $r['name'] ?? '',
-                $r['slug'] ?? '',
+                $this->link($r['links']['html']['href'] ?? null, $r['slug'] ?? ''),
                 ($r['is_private'] ?? false) ? 'yes' : 'no',
                 isset($r['updated_on']) ? substr($r['updated_on'], 0, 10) : '',
                 $r['language'] ?? '',

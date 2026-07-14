@@ -49,7 +49,7 @@ class PrShowCommand extends BitbucketCommand
         }
 
         $this->table([], [
-            ['#', $pr['id'] ?? ''],
+            ['#', $this->link($pr['links']['html']['href'] ?? null, $pr['id'] ?? '')],
             ['Title', $pr['title'] ?? ''],
             ['State', $pr['state'] ?? ''],
             ['Author', $pr['author']['display_name'] ?? ''],

@@ -66,12 +66,12 @@ class PrListCommand extends BitbucketCommand
         $this->table(
             ['#', 'Title', 'State', 'Author', 'Source', 'Dest', 'Updated'],
             array_map(fn (array $pr) => [
-                $pr['id'] ?? '',
+                $this->link($pr['links']['html']['href'] ?? null, $pr['id'] ?? ''),
                 Str::limit($pr['title'] ?? '', 40),
                 $pr['state'] ?? '',
                 $pr['author']['display_name'] ?? '',
-                Str::limit($pr['source']['branch']['name'] ?? '', 24),
-                Str::limit($pr['destination']['branch']['name'] ?? '', 24),
+                $pr['source']['branch']['name'] ?? '',
+                $pr['destination']['branch']['name'] ?? '',
                 isset($pr['updated_on']) ? substr($pr['updated_on'], 0, 10) : '',
             ], $prs),
         );
@@ -81,7 +81,7 @@ class PrListCommand extends BitbucketCommand
     {
         foreach ($prs as $pr) {
             $this->table([], [
-                ['#', $pr['id'] ?? ''],
+                ['#', $this->link($pr['links']['html']['href'] ?? null, $pr['id'] ?? '')],
                 ['Title', $pr['title'] ?? ''],
                 ['State', $pr['state'] ?? ''],
                 ['Author', $pr['author']['display_name'] ?? ''],

@@ -49,7 +49,7 @@ class RepoShowCommand extends BitbucketCommand
         $cloneSsh = collect($r['links']['clone'] ?? [])->firstWhere('name', 'ssh')['href'] ?? '';
 
         $this->table([], [
-            ['Full name', $r['full_name'] ?? ''],
+            ['Full name', $this->link($r['links']['html']['href'] ?? null, $r['full_name'] ?? '')],
             ['Description', $r['description'] ?? ''],
             ['Private', ($r['is_private'] ?? false) ? 'yes' : 'no'],
             ['Language', $r['language'] ?? ''],
