@@ -48,18 +48,20 @@ class PrShowCommand extends BitbucketCommand
             return $this->outputJson($pr);
         }
 
-        $this->table([], [
-            ['#', $this->link($pr['links']['html']['href'] ?? null, $pr['id'] ?? '')],
-            ['Title', $pr['title'] ?? ''],
-            ['State', $pr['state'] ?? ''],
-            ['Author', $pr['author']['display_name'] ?? ''],
-            ['Source', $pr['source']['branch']['name'] ?? ''],
-            ['Destination', $pr['destination']['branch']['name'] ?? ''],
-            ['Reviewers', collect($pr['reviewers'] ?? [])->pluck('display_name')->implode(', ')],
-            ['Comments', $pr['comment_count'] ?? 0],
-            ['Created', $pr['created_on'] ?? ''],
-            ['Updated', $pr['updated_on'] ?? ''],
-            ['Web', $pr['links']['html']['href'] ?? ''],
+        $url = $pr['links']['html']['href'] ?? null;
+
+        $this->detail([
+            '#' => $this->link($url, $pr['id'] ?? ''),
+            'Title' => e($pr['title'] ?? ''),
+            'State' => $this->badgeHtml($pr['state'] ?? ''),
+            'Author' => e($pr['author']['display_name'] ?? ''),
+            'Source' => e($pr['source']['branch']['name'] ?? ''),
+            'Destination' => e($pr['destination']['branch']['name'] ?? ''),
+            'Reviewers' => e(collect($pr['reviewers'] ?? [])->pluck('display_name')->implode(', ')),
+            'Comments' => $pr['comment_count'] ?? 0,
+            'Created' => e(substr((string) ($pr['created_on'] ?? ''), 0, 10)),
+            'Updated' => e(substr((string) ($pr['updated_on'] ?? ''), 0, 10)),
+            'Web' => $this->link($url, $url ?? ''),
         ]);
 
         if ($this->option('with-description') && filled($description = $pr['description'] ?? '')) {

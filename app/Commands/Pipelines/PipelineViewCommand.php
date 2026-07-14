@@ -46,38 +46,29 @@ class PipelineViewCommand extends BitbucketCommand
         }
 
         $p = $pipeline->json();
+        $url = $this->repoWebUrl($workspace, $slug).'/pipelines/results/'.($p['build_number'] ?? '');
 
-        $this->table([], [
-            ['Build #', $p['build_number'] ?? ''],
-            ['Status', $this->stateLabel($p['state']['result']['name'] ?? $p['state']['name'] ?? '')],
-            ['Ref', $p['target']['ref_name'] ?? ''],
-            ['Commit', substr($p['target']['commit']['hash'] ?? '', 0, 8)],
-            ['Trigger', $p['trigger']['name'] ?? ''],
-            ['Created', $p['created_on'] ?? ''],
-            ['Duration', isset($p['duration_in_seconds']) ? $p['duration_in_seconds'].'s' : ''],
+        $this->detail([
+            'Build #' => $this->link($url, $p['build_number'] ?? ''),
+            'Status' => $this->badgeHtml($p['state']['result']['name'] ?? $p['state']['name'] ?? ''),
+            'Ref' => e($p['target']['ref_name'] ?? ''),
+            'Commit' => e(substr($p['target']['commit']['hash'] ?? '', 0, 8)),
+            'Trigger' => e($p['trigger']['name'] ?? ''),
+            'Created' => e(substr((string) ($p['created_on'] ?? ''), 0, 19)),
+            'Duration' => isset($p['duration_in_seconds']) ? $p['duration_in_seconds'].'s' : '',
         ]);
 
-        $this->newLine();
-        $this->line('<options=bold>Steps</>');
-
-        foreach ($steps as $step) {
-            $name = $step['name'] ?? '(unnamed)';
-            $state = $this->stateLabel($step['state']['result']['name'] ?? $step['state']['name'] ?? '');
-            $this->line("  {$state}  {$name}");
+        if ($steps !== []) {
+            $rows = '';
+            foreach ($steps as $step) {
+                $rows .= '<div>'
+                    .$this->badgeHtml($step['state']['result']['name'] ?? $step['state']['name'] ?? '')
+                    .'<span class="ml-1">'.e($step['name'] ?? '(unnamed)').'</span>'
+                    .'</div>';
+            }
+            \Termwind\render('<div class="ml-1"><div class="font-bold">Steps</div>'.$rows.'</div>');
         }
 
         return self::SUCCESS;
-    }
-
-    private function stateLabel(string $state): string
-    {
-        return match ($state) {
-            'SUCCESSFUL' => '<fg=green>✓ SUCCESSFUL</>',
-            'FAILED' => '<fg=red>✗ FAILED  </>',
-            'STOPPED' => '<fg=gray>■ STOPPED  </>',
-            'IN_PROGRESS', 'RUNNING' => '<fg=yellow>• RUNNING  </>',
-            'PENDING' => '<fg=yellow>… PENDING  </>',
-            default => $state,
-        };
     }
 }

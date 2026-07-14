@@ -45,20 +45,21 @@ class RepoShowCommand extends BitbucketCommand
             return $this->outputJson($r);
         }
 
+        $url = $r['links']['html']['href'] ?? null;
         $cloneHttps = collect($r['links']['clone'] ?? [])->firstWhere('name', 'https')['href'] ?? '';
         $cloneSsh = collect($r['links']['clone'] ?? [])->firstWhere('name', 'ssh')['href'] ?? '';
 
-        $this->table([], [
-            ['Full name', $this->link($r['links']['html']['href'] ?? null, $r['full_name'] ?? '')],
-            ['Description', $r['description'] ?? ''],
-            ['Private', ($r['is_private'] ?? false) ? 'yes' : 'no'],
-            ['Language', $r['language'] ?? ''],
-            ['Main branch', $r['mainbranch']['name'] ?? ''],
-            ['Size', isset($r['size']) ? number_format($r['size'] / 1024, 1).' KB' : ''],
-            ['Updated', $r['updated_on'] ?? ''],
-            ['Web', $r['links']['html']['href'] ?? ''],
-            ['Clone (HTTPS)', $cloneHttps],
-            ['Clone (SSH)', $cloneSsh],
+        $this->detail([
+            'Full name' => $this->link($url, $r['full_name'] ?? ''),
+            'Description' => e($r['description'] ?? ''),
+            'Private' => ($r['is_private'] ?? false) ? 'yes' : 'no',
+            'Language' => e($r['language'] ?? ''),
+            'Main branch' => e($r['mainbranch']['name'] ?? ''),
+            'Size' => isset($r['size']) ? number_format($r['size'] / 1024, 1).' KB' : '',
+            'Updated' => e(substr((string) ($r['updated_on'] ?? ''), 0, 10)),
+            'Web' => $this->link($url, $url ?? ''),
+            'Clone (HTTPS)' => $this->link($cloneHttps ?: null, $cloneHttps),
+            'Clone (SSH)' => e($cloneSsh),
         ]);
 
         return self::SUCCESS;

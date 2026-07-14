@@ -167,6 +167,84 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Classify a Bitbucket state into a visual kind and a status symbol.
+     *
+     * @return array{0: string, 1: string} [kind, symbol]
+     */
+    protected function stateKind(string $state): array
+    {
+        return match (strtoupper($state)) {
+            'SUCCESSFUL', 'MERGED', 'APPROVED', 'RESOLVED', 'COMPLETED' => ['ok', '✓'],
+            'FAILED', 'ERROR', 'DECLINED' => ['bad', '✗'],
+            'STOPPED' => ['bad', '■'],
+            'INPROGRESS', 'IN_PROGRESS', 'RUNNING', 'BUILDING', 'PENDING', 'OPEN', 'NEW' => ['warn', '•'],
+            default => ['neutral', ''],
+        };
+    }
+
+    /**
+     * A coloured status pill using Symfony markup — safe inside Prompts
+     * tables and $this->line() output.
+     */
+    protected function badge(string $state): string
+    {
+        [$kind, $symbol] = $this->stateKind($state);
+        $label = trim("{$symbol} {$state}");
+
+        return match ($kind) {
+            'ok' => "<bg=green;fg=black> {$label} </>",
+            'bad' => "<bg=red;fg=white> {$label} </>",
+            'warn' => "<bg=yellow;fg=black> {$label} </>",
+            default => "<options=bold> {$label} </>",
+        };
+    }
+
+    /**
+     * A coloured status pill as Termwind HTML — for use inside render() blocks.
+     */
+    protected function badgeHtml(string $state): string
+    {
+        [$kind, $symbol] = $this->stateKind($state);
+        $label = trim("{$symbol} {$state}");
+
+        $class = match ($kind) {
+            'ok' => 'bg-green-600 text-white',
+            'bad' => 'bg-red-600 text-white',
+            'warn' => 'bg-yellow-600 text-black',
+            default => 'bg-gray-500 text-white',
+        };
+
+        return '<span class="px-1 '.$class.'">'.e($label).'</span>';
+    }
+
+    /**
+     * Render a key/value detail block with Termwind. Values are treated as raw
+     * HTML — wrap plain text with e() and use link()/badgeHtml() for the rest.
+     * Empty values are skipped.
+     *
+     * @param  array<string, string|int|null>  $pairs
+     */
+    protected function detail(array $pairs): void
+    {
+        $rows = '';
+        foreach ($pairs as $label => $value) {
+            if (blank($value)) {
+                continue;
+            }
+            $rows .= '<div>'
+                .'<span class="w-28 text-gray-500">'.e($label).'</span>'
+                .'<span>'.$value.'</span>'
+                .'</div>';
+        }
+
+        if ($rows === '') {
+            return;
+        }
+
+        \Termwind\render('<div class="my-1 ml-1">'.$rows.'</div>');
+    }
+
+    /**
      * Truncate a single cell to a visible width, leaving markup cells alone.
      */
     protected function truncateCell(string $value, int $max): string

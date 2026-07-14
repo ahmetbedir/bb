@@ -70,21 +70,25 @@ class PrStatusCommand extends BitbucketCommand
 
     private function section(string $title, array $prs): void
     {
-        $this->newLine();
-        $this->line("<options=bold>{$title}</>");
+        $body = '';
 
         if ($prs === []) {
-            $this->line('  <fg=gray>None</>');
+            $body = '<div class="text-gray-500">None</div>';
+        } else {
+            foreach ($prs as $pr) {
+                $id = $pr['id'] ?? '?';
+                $number = $this->link($pr['links']['html']['href'] ?? null, "#{$id}");
+                $prtitle = e(Str::limit($pr['title'] ?? '', 60));
+                $branch = e($pr['source']['branch']['name'] ?? '');
 
-            return;
+                $body .= '<div>'
+                    .'<span class="text-green-500">'.$number.'</span>'
+                    .'<span class="ml-1">'.$prtitle.'</span>'
+                    .'<span class="ml-1 text-gray-500">['.$branch.']</span>'
+                    .'</div>';
+            }
         }
 
-        foreach ($prs as $pr) {
-            $id = $pr['id'] ?? '?';
-            $prtitle = Str::limit($pr['title'] ?? '', 60);
-            $branch = $pr['source']['branch']['name'] ?? '';
-            $number = $this->link($pr['links']['html']['href'] ?? null, "#{$id}");
-            $this->line("  <fg=green>{$number}</> {$prtitle} <fg=gray>[{$branch}]</>");
-        }
+        \Termwind\render('<div class="mt-1 ml-1"><div class="font-bold">'.e($title).'</div>'.$body.'</div>');
     }
 }

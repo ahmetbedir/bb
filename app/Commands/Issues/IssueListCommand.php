@@ -60,7 +60,7 @@ class IssueListCommand extends BitbucketCommand
                 Str::limit($i['title'] ?? '', 40),
                 $i['kind'] ?? '',
                 $i['priority'] ?? '',
-                $i['state'] ?? '',
+                $this->badge($i['state'] ?? ''),
                 $i['assignee']['display_name'] ?? '-',
                 isset($i['updated_on']) ? substr($i['updated_on'], 0, 10) : '',
             ], $issues),

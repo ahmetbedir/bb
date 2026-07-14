@@ -47,17 +47,19 @@ class IssueViewCommand extends BitbucketCommand
             return $this->outputJson($issue);
         }
 
-        $this->table([], [
-            ['#', $this->link($issue['links']['html']['href'] ?? null, $issue['id'] ?? '')],
-            ['Title', $issue['title'] ?? ''],
-            ['State', $issue['state'] ?? ''],
-            ['Kind', $issue['kind'] ?? ''],
-            ['Priority', $issue['priority'] ?? ''],
-            ['Reporter', $issue['reporter']['display_name'] ?? ''],
-            ['Assignee', $issue['assignee']['display_name'] ?? '-'],
-            ['Created', $issue['created_on'] ?? ''],
-            ['Updated', $issue['updated_on'] ?? ''],
-            ['Web', $issue['links']['html']['href'] ?? ''],
+        $url = $issue['links']['html']['href'] ?? null;
+
+        $this->detail([
+            '#' => $this->link($url, $issue['id'] ?? ''),
+            'Title' => e($issue['title'] ?? ''),
+            'State' => $this->badgeHtml($issue['state'] ?? ''),
+            'Kind' => e($issue['kind'] ?? ''),
+            'Priority' => e($issue['priority'] ?? ''),
+            'Reporter' => e($issue['reporter']['display_name'] ?? ''),
+            'Assignee' => e($issue['assignee']['display_name'] ?? '-'),
+            'Created' => e(substr((string) ($issue['created_on'] ?? ''), 0, 10)),
+            'Updated' => e(substr((string) ($issue['updated_on'] ?? ''), 0, 10)),
+            'Web' => $this->link($url, $url ?? ''),
         ]);
 
         if (filled($content = $issue['content']['raw'] ?? '')) {

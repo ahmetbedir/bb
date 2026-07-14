@@ -66,16 +66,11 @@ class PipelineListCommand extends BitbucketCommand
 
     private function pipelineStatus(array $pipeline): string
     {
-        $stateName = $pipeline['state']['name'] ?? '';
-        $result = $pipeline['state']['result']['name'] ?? $pipeline['state']['stage']['name'] ?? $stateName;
+        $result = $pipeline['state']['result']['name']
+            ?? $pipeline['state']['stage']['name']
+            ?? $pipeline['state']['name']
+            ?? '';
 
-        return match ($result) {
-            'SUCCESSFUL' => '<fg=green>✓ SUCCESSFUL</>',
-            'FAILED' => '<fg=red>✗ FAILED</>',
-            'STOPPED' => '<fg=gray>■ STOPPED</>',
-            'IN_PROGRESS', 'RUNNING' => '<fg=yellow>• IN PROGRESS</>',
-            'PENDING' => '<fg=yellow>… PENDING</>',
-            default => (string) $result,
-        };
+        return $this->badge($result);
     }
 }

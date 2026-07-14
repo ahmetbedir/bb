@@ -47,26 +47,15 @@ class PrChecksCommand extends BitbucketCommand
         $this->table(
             ['State', 'Name', 'Key', 'URL'],
             array_map(fn (array $s) => [
-                $this->stateLabel($s['state'] ?? ''),
+                $this->badge($s['state'] ?? ''),
                 $s['name'] ?? '',
                 $s['key'] ?? '',
-                $s['url'] ?? '',
+                $this->link($s['url'] ?? null, $s['url'] ?? ''),
             ], $statuses),
         );
 
         $failed = collect($statuses)->contains(fn ($s) => ($s['state'] ?? '') === 'FAILED');
 
         return $failed ? self::FAILURE : self::SUCCESS;
-    }
-
-    private function stateLabel(string $state): string
-    {
-        return match ($state) {
-            'SUCCESSFUL' => '<fg=green>✓ SUCCESSFUL</>',
-            'FAILED' => '<fg=red>✗ FAILED</>',
-            'INPROGRESS' => '<fg=yellow>• INPROGRESS</>',
-            'STOPPED' => '<fg=gray>■ STOPPED</>',
-            default => $state,
-        };
     }
 }
