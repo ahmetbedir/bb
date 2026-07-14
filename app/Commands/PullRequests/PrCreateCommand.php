@@ -58,7 +58,14 @@ class PrCreateCommand extends BitbucketCommand
 
         [$filledTitle, $filledBody] = $this->option('fill') ? $this->fillFromCommits($dest) : [null, null];
 
-        $title = $this->option('title') ?: $filledTitle ?: text('Title', required: true);
+        // Title isn't required: suggest the --fill title, else "Merge X into Y".
+        if (filled($title = $this->option('title'))) {
+            // use the explicit --title as-is
+        } else {
+            $suggested = $filledTitle ?: "Merge {$source} into {$dest}";
+            $title = text('Title', default: $suggested) ?: $suggested;
+        }
+
         $description = $this->option('description') ?: $filledBody;
 
         $response = $this->send(new CreatePullRequest(
