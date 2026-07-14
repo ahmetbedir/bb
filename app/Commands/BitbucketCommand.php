@@ -10,6 +10,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
+use Symfony\Component\Console\Terminal;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
@@ -32,17 +33,110 @@ use function Laravel\Prompts\warning;
 abstract class BitbucketCommand extends Command
 {
     /**
-     * Render a table with Laravel Prompts.
+     * Render a table with Laravel Prompts, truncating cells so the table
+     * always fits the terminal width. Without this, a single long cell (e.g.
+     * a URL) overflows and Laravel Prompts draws broken, misaligned borders.
      *
      * @param  Arrayable<int, mixed>|array<int, mixed>  $headers
      * @param  Arrayable<int, mixed>|array<int, mixed>  $rows
      */
     public function table($headers = [], $rows = [], $tableStyle = 'default', array $columnStyles = []): void
     {
-        table(
-            $headers instanceof Arrayable ? $headers->toArray() : $headers,
-            $rows instanceof Arrayable ? $rows->toArray() : $rows,
-        );
+        $headers = $headers instanceof Arrayable ? $headers->toArray() : $headers;
+        $rows = $rows instanceof Arrayable ? $rows->toArray() : $rows;
+
+        [$headers, $rows] = $this->fitTableToTerminal($headers, $rows);
+
+        table($headers, $rows);
+    }
+
+    /**
+     * Shrink columns so the whole table fits the terminal width, avoiding the
+     * broken borders Laravel Prompts draws when a row overflows.
+     *
+     * Columns that can't be truncated (they contain Symfony <markup>) keep
+     * their full width; the remaining space is shared among the rest in
+     * proportion to their natural width.
+     *
+     * @param  array<int, mixed>  $headers
+     * @param  array<int, array<int, mixed>>  $rows
+     * @return array{0: array<int, string>, 1: array<int, array<int, string>>}
+     */
+    protected function fitTableToTerminal(array $headers, array $rows): array
+    {
+        if ($rows === []) {
+            return [$headers, $rows];
+        }
+
+        $columns = count($headers) ?: count($rows[0]);
+
+        if ($columns === 0) {
+            return [$headers, $rows];
+        }
+
+        $strip = fn ($value): string => preg_replace('/<[^>]+>/', '', (string) $value) ?? '';
+        $measure = fn ($value): int => mb_strwidth($strip($value));
+
+        // Prompts renders " │ " between cells: 3 chars per column + the outer
+        // border and a leading space. Keep a couple of chars of head-room.
+        $terminalWidth = (new Terminal)->getWidth();
+        $available = max(20, $terminalWidth - ($columns * 3 + 4));
+
+        // Natural (untruncated) width and truncatability of each column.
+        $natural = array_fill(0, $columns, 0);
+        $fixed = array_fill(0, $columns, false);
+        foreach ($headers as $i => $header) {
+            $natural[$i] = $measure($header);
+        }
+        foreach ($rows as $row) {
+            foreach (array_values($row) as $i => $cell) {
+                $natural[$i] = max($natural[$i] ?? 0, $measure($cell));
+                if (str_contains((string) $cell, '<')) {
+                    $fixed[$i] = true; // contains markup — never truncate
+                }
+            }
+        }
+
+        if (array_sum($natural) <= $available) {
+            return [$headers, $rows];
+        }
+
+        // Reserve full width for fixed columns; share the rest proportionally.
+        $reserved = 0;
+        $flexTotal = 0;
+        foreach ($natural as $i => $width) {
+            $fixed[$i] ? $reserved += $width : $flexTotal += $width;
+        }
+        $flexBudget = max(0, $available - $reserved);
+        $flexTotal = $flexTotal ?: 1;
+
+        $caps = [];
+        foreach ($natural as $i => $width) {
+            $caps[$i] = $fixed[$i]
+                ? $width
+                : max(6, (int) floor($flexBudget * ($width / $flexTotal)));
+        }
+
+        $headers = array_map(fn ($h, $i) => $this->truncateCell((string) $h, $caps[$i] ?? 40), $headers, array_keys($headers));
+        $rows = array_map(fn (array $row) => array_map(
+            fn ($cell, $i) => $this->truncateCell((string) $cell, $caps[$i] ?? 40),
+            array_values($row),
+            array_keys(array_values($row)),
+        ), $rows);
+
+        return [$headers, $rows];
+    }
+
+    /**
+     * Truncate a single cell to a visible width, leaving markup cells alone.
+     */
+    protected function truncateCell(string $value, int $max): string
+    {
+        if (str_contains($value, '<') || mb_strwidth($value) <= $max) {
+            return $value;
+        }
+
+        return rtrim(mb_substr($value, 0, max(1, $max - 1))).'…';
     }
 
     public function info($string, $verbosity = null): void
