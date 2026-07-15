@@ -768,8 +768,15 @@ abstract class BitbucketCommand extends Command
 
         $this->error("Bitbucket API [{$response->status()}]: {$message}");
 
-        if ($response->status() === 401) {
+        $status = $response->status();
+        $url = $response->getPendingRequest()->getUrl();
+
+        if ($status === 401) {
             $this->warn('Your credentials were rejected. Run "bb auth login" or "bb configure" to re-authenticate.');
+        }
+
+        if (in_array($status, [404, 410], true) && str_contains($url, '/issues')) {
+            $this->warn('This repository does not have the issue tracker enabled (turn it on in Repository settings → Issue tracker).');
         }
     }
 }

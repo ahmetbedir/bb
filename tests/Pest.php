@@ -53,7 +53,13 @@ expect()->extend('toBeOne', function () {
  */
 function runCommand(string $command, array $parameters = []): array
 {
-    $buffer = new BufferedOutput;
+    // A headless test has no real terminal; pin a wide width so table sizing
+    // is deterministic (mirrors a normal-width terminal, not an 80-col squeeze).
+    putenv('COLUMNS=200');
+
+    // Decorated so Laravel Prompts treats ANSI / OSC 8 escapes as zero-width
+    // when sizing tables — mirroring a real terminal.
+    $buffer = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
     $code = app(Kernel::class)->call($command, $parameters, $buffer);
 
     return [$code, $buffer->fetch()];

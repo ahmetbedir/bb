@@ -68,7 +68,9 @@ it('lists pipelines', function () {
         ], 200),
     ]);
 
-    [$code, $output] = runCommand('pipeline:list', ['--repo' => 'acme/api']);
+    // Content via --json (table cells carry ANSI/OSC8 the headless renderer
+    // may truncate; JSON is deterministic).
+    [$code, $output] = runCommand('pipeline:list', ['--repo' => 'acme/api', '--json' => true]);
 
     expect($code)->toBe(0);
     expect($output)->toContain('SUCCESSFUL');

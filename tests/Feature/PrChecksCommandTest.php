@@ -23,10 +23,13 @@ it('lists build statuses and fails on a failed check', function () {
         ], 200),
     ]);
 
-    [$code, $output] = runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api']);
+    // Content via --json (table cells carry ANSI/OSC8 that the headless
+    // Prompts renderer may truncate; JSON is deterministic).
+    [, $json] = runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api', '--json' => true]);
+    expect($json)->toContain('SUCCESSFUL')->toContain('FAILED');
 
-    expect($output)->toContain('SUCCESSFUL')->toContain('FAILED');
-    // Non-zero exit when a check has FAILED.
+    // The table path returns a non-zero exit when a check has FAILED.
+    [$code] = runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api']);
     expect($code)->toBe(1);
 });
 
