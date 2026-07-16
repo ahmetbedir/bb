@@ -6,6 +6,8 @@ A `gh`-style command-line client for **Bitbucket Cloud**, built with
 Manage repositories, pull requests, issues, branches and pipelines from your
 terminal — and let `git` push/pull over HTTPS using the same credentials.
 
+![bb demo](assets/demo.gif)
+
 ---
 
 ## Install
