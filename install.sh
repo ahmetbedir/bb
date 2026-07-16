@@ -1,40 +1,63 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 #
-# Build bb into a single-file PHAR and install it onto your PATH.
+# Download the latest standalone bb binary for this machine and install it.
+# Published as a release asset, so a plain curl works for everyone:
 #
-#   ./install.sh                 # installs to ~/.local/bin (may prompt for sudo)
-#   PREFIX=~/.local/bin ./install.sh   # installs somewhere without sudo
+#   curl -fsSL https://github.com/OWNER/REPO/releases/latest/download/install.sh | sh
 #
-set -euo pipefail
+# Override the install directory with BB_INSTALL_DIR (default /usr/local/bin,
+# falling back to ~/.local/bin when that isn't writable).
 
-cd "$(dirname "$0")"
+set -eu
 
-PREFIX="${PREFIX:-$HOME/.local/bin}"
-# Expand a leading ~ in case PREFIX was passed quoted (the shell won't).
-PREFIX="${PREFIX/#\~/$HOME}"
-echo "==> Installing bb to ${PREFIX}"
-VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo dev)}"
+REPO="@@REPO@@"
 
-echo "==> Building bb ${VERSION}"
-php bb app:build bb --build-version="${VERSION}" --no-interaction >/dev/null
+os="$(uname -s)"
+arch="$(uname -m)"
 
-mkdir -p "${PREFIX}"
-TARGET="${PREFIX}/bb"
+case "$os" in
+    Darwin) os=macos ;;
+    Linux)  os=linux ;;
+    *) echo "Unsupported OS: $os" >&2; exit 1 ;;
+esac
 
-if [ -w "${PREFIX}" ]; then
-    install -m 0755 builds/bb "${TARGET}"
+case "$arch" in
+    arm64|aarch64) arch=arm64 ;;
+    x86_64|amd64)  arch=x86_64 ;;
+    *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;
+esac
+
+asset="bb-${os}-${arch}"
+url="https://github.com/${REPO}/releases/latest/download/${asset}"
+
+dir="${BB_INSTALL_DIR:-/usr/local/bin}"
+[ -d "$dir" ] || dir="$HOME/.local/bin"
+mkdir -p "$dir"
+
+tmp="$(mktemp)"
+echo "==> Downloading ${asset}"
+curl -fsSL "$url" -o "$tmp"
+chmod +x "$tmp"
+
+target="${dir}/bb"
+if [ -w "$dir" ]; then
+    mv "$tmp" "$target"
 else
-    echo "==> ${PREFIX} is not writable, using sudo"
-    sudo install -m 0755 builds/bb "${TARGET}"
+    echo "==> ${dir} is not writable, using sudo"
+    sudo mv "$tmp" "$target"
 fi
 
-echo "==> Installed to ${TARGET}"
-"${TARGET}" --version
+echo "==> Installed to ${target}"
+"$target" --version || true
+
+case ":$PATH:" in
+    *":$dir:"*) ;;
+    *) echo "   Note: add ${dir} to your PATH." ;;
+esac
 
 cat <<'EOF'
 
 Next steps:
   bb configure          # or: bb auth login   (OAuth in the browser)
   bb auth setup-git     # let git push/pull authenticate via bb
-  bb completion bash    # shell completion (also: zsh, fish)
 EOF

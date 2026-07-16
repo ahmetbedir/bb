@@ -8,24 +8,46 @@ terminal — and let `git` push/pull over HTTPS using the same credentials.
 
 ---
 
-## Requirements
-
-- PHP 8.2+
-- `git` on your PATH
-- `jq` on your PATH (optional — only for `--jq` filtering)
-
 ## Install
 
+### Homebrew (recommended)
+
 ```bash
-./install.sh                        # builds a PHAR and installs to /usr/local/bin
-PREFIX=~/.local/bin ./install.sh    # install without sudo
+brew install ahmetbedir/tap/bb
 ```
 
-Or run from source during development:
+Ships as a **standalone native binary** (PHP is bundled) — no PHP install
+required. `git` is needed for git-integrated commands, and `jq` is optional
+(only for `--jq` filtering).
+
+Upgrade / uninstall:
+
+```bash
+brew upgrade bb
+brew uninstall bb
+```
+
+### Without Homebrew
+
+```bash
+# macOS / Linux
+curl -fsSL https://github.com/ahmetbedir/bb/releases/latest/download/install.sh | sh
+
+# Windows (PowerShell)
+irm https://github.com/ahmetbedir/bb/releases/latest/download/install.ps1 | iex
+```
+
+### From source (development)
 
 ```bash
 composer install
 php bb <command>
+```
+
+Requires PHP 8.2+. To produce the native binaries + Homebrew formula locally:
+
+```bash
+scripts/release.sh v1.0.2   # builds dist/release/bb-* and dist/release/bb.rb
 ```
 
 ## Authentication

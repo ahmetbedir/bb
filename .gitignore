@@ -1,5 +1,6 @@
 /vendor
 /builds
+/dist
 /.idea
 /.vscode
 /.vagrant

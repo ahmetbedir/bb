@@ -1,0 +1,7 @@
+{
+    "src": "./builds/bb.phar",
+    "dest": "./builds/build",
+    "platform": "all",
+    "architectures": ["arm", "x64"],
+    "php": "8.4"
+}
