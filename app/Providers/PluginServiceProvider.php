@@ -54,12 +54,16 @@ class PluginServiceProvider extends ServiceProvider
             return;
         }
 
-        // Register under a "plugin:" namespace so plugin commands are grouped
-        // together and can never shadow a native command.
+        // Register plugin commands under their own signature (no prefix), but
+        // never let one shadow a native command — built-ins always win.
         Application::starting(function ($artisan) use ($commands) {
             foreach ($commands as $class) {
                 $command = $this->app->make($class);
-                $command->setName('plugin:'.$command->getName());
+
+                if ($artisan->has($command->getName())) {
+                    continue;
+                }
+
                 $artisan->add($command);
             }
         });

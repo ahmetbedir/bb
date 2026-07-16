@@ -235,15 +235,14 @@ class HelloCommand extends BitbucketCommand
 ```
 
 ```bash
-bb plugin:hello       # plugin commands are auto-namespaced under "plugin:"
+bb hello              # a plugin's signature IS its command name
 bb plugin:list        # show loaded plugins
 bb plugin:install <git-url|gist:ID|./path.php|./dir>   # install a plugin
 bb plugin:remove <name>                        # remove one (interactive if omitted)
 ```
 
-Declare the signature without the prefix (`hello`); bb registers it as
-`plugin:hello` so plugins are grouped together and can never shadow a native
-command.
+A plugin's `$signature` is used verbatim as its command name. Built-ins always
+win on a name clash — a plugin can never shadow a native command.
 
 A ready-made example (a standardized branch creator) lives in
 [examples/plugins/BranchNewCommand.php](examples/plugins/BranchNewCommand.php):
@@ -252,7 +251,7 @@ A ready-made example (a standardized branch creator) lives in
 cp examples/plugins/BranchNewCommand.php ~/.config/bb/plugins/
 bb config branch_types  "feature,bugfix,hotfix,chore"
 bb config branch_format "{type}/{ticket}-{slug}"
-bb plugin:branch:new
+bb branch:new
 ```
 
 Plugins load in both the source and the compiled PHAR build.

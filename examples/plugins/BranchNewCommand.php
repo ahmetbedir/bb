@@ -10,13 +10,13 @@
  *   bb config branch_types  "feature,bugfix,hotfix,chore"
  *   bb config branch_format "{type}/{ticket}-{slug}"
  *
- * Use (plugin commands are auto-namespaced under "plugin:"):
- *   bb plugin:branch:new
+ * Use:
+ *   bb branch:new
  *
  * A plugin is just a class extending App\Commands\BitbucketCommand, so it gets
- * the exact same Prompts/Termwind styling and helpers as native commands.
- * Declare its signature without the prefix (e.g. "branch:new"); bb registers
- * it as "plugin:branch:new".
+ * the exact same Prompts/Termwind styling and helpers as native commands. Its
+ * signature ("branch:new") is the command name; bb won't let a plugin shadow a
+ * built-in, so built-ins always win on a name clash.
  */
 
 use App\Commands\BitbucketCommand;

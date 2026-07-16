@@ -11,7 +11,7 @@ use function Laravel\Prompts\select;
 class PluginRemoveCommand extends BitbucketCommand
 {
     protected $signature = 'plugin:remove
-        {name? : Plugin command (e.g. plugin:branch:new) or file/dir name}
+        {name? : Plugin command (e.g. branch:new) or file/dir name}
         {--yes : Skip the confirmation prompt}';
 
     protected $description = 'Remove an installed plugin from ~/.config/bb/plugins';
@@ -27,7 +27,7 @@ class PluginRemoveCommand extends BitbucketCommand
             return self::SUCCESS;
         }
 
-        $byCommand = $this->pluginCommandEntries($dir); // "plugin:foo" => "Foo.php"
+        $byCommand = $this->pluginCommandEntries($dir); // "branch:new" => "Foo.php"
 
         $entry = $this->resolveEntry($this->argument('name'), $entries, $byCommand);
 
@@ -85,7 +85,6 @@ class PluginRemoveCommand extends BitbucketCommand
             in_array($name, $entries, true) => $name,
             in_array("{$name}.php", $entries, true) => "{$name}.php",
             isset($byCommand[$name]) => $byCommand[$name],
-            isset($byCommand["plugin:{$name}"]) => $byCommand["plugin:{$name}"],
             default => null,
         };
 
