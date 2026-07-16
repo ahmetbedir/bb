@@ -235,7 +235,7 @@ class HelloCommand extends BitbucketCommand
 ```bash
 bb plugin:hello       # plugin commands are auto-namespaced under "plugin:"
 bb plugin:list        # show loaded plugins
-bb plugin:install <git-url|./path.php|./dir>   # install a plugin
+bb plugin:install <git-url|gist:ID|./path.php|./dir>   # install a plugin
 bb plugin:remove <name>                        # remove one (interactive if omitted)
 ```
 

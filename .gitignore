@@ -1,6 +1,7 @@
 /vendor
 /builds
 /dist
+/local-install.sh
 /.idea
 /.vscode
 /.vagrant

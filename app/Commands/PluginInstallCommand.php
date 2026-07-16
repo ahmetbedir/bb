@@ -8,7 +8,7 @@ use Symfony\Component\Process\Process;
 class PluginInstallCommand extends BitbucketCommand
 {
     protected $signature = 'plugin:install
-        {source : Git URL, or a local .php file / directory}
+        {source : Git URL, GitHub gist (gist:<id> or a gist URL), or a local .php file / directory}
         {--name= : Install under this name (defaults to the source name)}';
 
     protected $description = 'Install a plugin into ~/.config/bb/plugins';
@@ -25,9 +25,42 @@ class PluginInstallCommand extends BitbucketCommand
 
         $source = $this->argument('source');
 
+        if ($gist = $this->gistTarget($source)) {
+            return $this->installFromGit($dir, $gist['url'], $gist['name']);
+        }
+
         return $this->isGitUrl($source)
             ? $this->installFromGit($dir, $source)
             : $this->installFromPath($dir, $source);
+    }
+
+    /**
+     * Recognise a GitHub gist source ("gist:<id>" or a gist.github.com URL)
+     * and return its git clone URL + a friendly name. A gist is a git repo.
+     *
+     * @return array{url: string, name: string}|null
+     */
+    private function gistTarget(string $source): ?array
+    {
+        if (str_starts_with($source, 'gist:')) {
+            $id = substr($source, 5);
+        } elseif (str_contains($source, 'gist.github.com')) {
+            $path = parse_url($source, PHP_URL_PATH) ?: '';
+            $id = preg_replace('/\.git$/', '', basename($path));
+        } else {
+            return null;
+        }
+
+        $id = trim($id);
+
+        if ($id === '') {
+            return null;
+        }
+
+        return [
+            'url' => "https://gist.github.com/{$id}.git",
+            'name' => 'gist-'.substr($id, 0, 12),
+        ];
     }
 
     private function isGitUrl(string $source): bool
@@ -37,9 +70,9 @@ class PluginInstallCommand extends BitbucketCommand
             || str_ends_with($source, '.git');
     }
 
-    private function installFromGit(string $dir, string $source): int
+    private function installFromGit(string $dir, string $source, ?string $name = null): int
     {
-        $name = $this->option('name') ?: preg_replace('/\.git$/', '', basename($source));
+        $name = $this->option('name') ?: $name ?: preg_replace('/\.git$/', '', basename($source));
         $target = "{$dir}/{$name}";
 
         if (is_dir($target)) {

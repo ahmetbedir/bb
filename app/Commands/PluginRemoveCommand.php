@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Support\CredentialStore;
+use ReflectionClass;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\select;
@@ -10,7 +11,7 @@ use function Laravel\Prompts\select;
 class PluginRemoveCommand extends BitbucketCommand
 {
     protected $signature = 'plugin:remove
-        {name? : Plugin file or directory name (as shown by plugin:list)}
+        {name? : Plugin command (e.g. plugin:branch:new) or file/dir name}
         {--yes : Skip the confirmation prompt}';
 
     protected $description = 'Remove an installed plugin from ~/.config/bb/plugins';
@@ -26,26 +27,21 @@ class PluginRemoveCommand extends BitbucketCommand
             return self::SUCCESS;
         }
 
-        $name = $this->argument('name') ?: select('Which plugin to remove?', $entries);
+        $byCommand = $this->pluginCommandEntries($dir); // "plugin:foo" => "Foo.php"
 
-        // Accept the entry with or without a trailing ".php".
-        $target = match (true) {
-            in_array($name, $entries, true) => "{$dir}/{$name}",
-            in_array("{$name}.php", $entries, true) => "{$dir}/{$name}.php",
-            default => null,
-        };
+        $entry = $this->resolveEntry($this->argument('name'), $entries, $byCommand);
 
-        if ($target === null || ! file_exists($target)) {
-            $this->error("No installed plugin named \"{$name}\".");
-
+        if ($entry === null) {
             return self::FAILURE;
         }
 
-        if (! $this->option('yes') && ! $this->confirm("Remove plugin \"{$name}\"?", true)) {
+        if (! $this->option('yes') && ! $this->confirm("Remove plugin \"{$entry}\"?", true)) {
             $this->line('Aborted.');
 
             return self::SUCCESS;
         }
+
+        $target = "{$dir}/{$entry}";
 
         // Guard: never delete outside the plugins directory.
         if (! str_starts_with((string) realpath($target), (string) realpath($dir))) {
@@ -60,9 +56,71 @@ class PluginRemoveCommand extends BitbucketCommand
             @unlink($target);
         }
 
-        $this->info("Removed plugin \"{$name}\".");
+        $this->info("Removed plugin \"{$entry}\".");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Resolve the argument (a command name, file, or dir) to a top-level entry
+     * in the plugins directory, or prompt for one.
+     *
+     * @param  array<int, string>  $entries
+     * @param  array<string, string>  $byCommand
+     */
+    private function resolveEntry(?string $name, array $entries, array $byCommand): ?string
+    {
+        if (blank($name)) {
+            // Show a friendly list labelled with the command each entry provides.
+            $options = [];
+            foreach ($entries as $entry) {
+                $commands = array_keys(array_filter($byCommand, fn ($e) => $e === $entry));
+                $options[$entry] = $commands === [] ? $entry : $entry.'  ('.implode(', ', $commands).')';
+            }
+
+            return select('Which plugin to remove?', $options);
+        }
+
+        $entry = match (true) {
+            in_array($name, $entries, true) => $name,
+            in_array("{$name}.php", $entries, true) => "{$name}.php",
+            isset($byCommand[$name]) => $byCommand[$name],
+            isset($byCommand["plugin:{$name}"]) => $byCommand["plugin:{$name}"],
+            default => null,
+        };
+
+        if ($entry === null) {
+            $this->error("No installed plugin matches \"{$name}\". See: bb plugin:list");
+        }
+
+        return $entry;
+    }
+
+    /**
+     * Map each loaded plugin command name to its top-level plugins entry
+     * (a file like "Foo.php" or a subdirectory like "gist-abc").
+     *
+     * @return array<string, string>
+     */
+    private function pluginCommandEntries(string $dir): array
+    {
+        $realDir = realpath($dir);
+
+        if ($realDir === false) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($this->getApplication()->all() as $name => $command) {
+            $file = (new ReflectionClass($command))->getFileName();
+
+            if ($file && str_starts_with($file, $realDir)) {
+                $relative = ltrim(substr($file, strlen($realDir)), '/');
+                $map[$name] = explode('/', $relative)[0];
+            }
+        }
+
+        return $map;
     }
 
     /**
