@@ -21,14 +21,30 @@ class CredentialStore
         $this->path ??= static::defaultPath();
     }
 
-    public static function defaultPath(): string
+    /**
+     * The bb home directory (~/.config/bb), honouring BB_HOME.
+     */
+    public static function homeDir(): string
     {
         $home = getenv('BB_HOME')
             ?: getenv('HOME')
             ?: getenv('USERPROFILE')
             ?: sys_get_temp_dir();
 
-        return rtrim($home, '/').'/.config/bb/config.json';
+        return rtrim($home, '/').'/.config/bb';
+    }
+
+    public static function defaultPath(): string
+    {
+        return static::homeDir().'/config.json';
+    }
+
+    /**
+     * Where user plugins live (~/.config/bb/plugins).
+     */
+    public static function pluginsPath(): string
+    {
+        return static::homeDir().'/plugins';
     }
 
     public function path(): string

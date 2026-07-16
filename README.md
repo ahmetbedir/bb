@@ -184,6 +184,55 @@ Commands taking `[id]` default to the open PR for the current branch when no id 
 - **Rate limits** — HTTP 429 responses are retried with backoff (honouring `Retry-After`).
 - **`BB_DEBUG=1`** — trace every request/response to stderr.
 
+## Plugins
+
+Drop a PHP command class into `~/.config/bb/plugins/` and it becomes a bb
+command — running with the **same** connector, helpers and Prompts/Termwind
+styling as the built-ins. A plugin is any class extending
+`App\Commands\BitbucketCommand`:
+
+```php
+// ~/.config/bb/plugins/HelloCommand.php
+use App\Commands\BitbucketCommand;
+
+class HelloCommand extends BitbucketCommand
+{
+    protected $signature = 'hello';
+    protected $description = 'Say hello';
+
+    public function handle(): int
+    {
+        $this->info('Hi from a plugin!');           // native look & feel
+        // full access: $this->table(), $this->badge(), $this->send(),
+        // $this->resolveRepo(), $this->link(), Laravel Prompts, etc.
+        return self::SUCCESS;
+    }
+}
+```
+
+```bash
+bb plugin:hello       # plugin commands are auto-namespaced under "plugin:"
+bb plugin:list        # show loaded plugins
+bb plugin:install <git-url|./path.php|./dir>   # install a plugin
+bb plugin:remove <name>                        # remove one (interactive if omitted)
+```
+
+Declare the signature without the prefix (`hello`); bb registers it as
+`plugin:hello` so plugins are grouped together and can never shadow a native
+command.
+
+A ready-made example (a standardized branch creator) lives in
+[examples/plugins/BranchNewCommand.php](examples/plugins/BranchNewCommand.php):
+
+```bash
+cp examples/plugins/BranchNewCommand.php ~/.config/bb/plugins/
+bb config branch_types  "feature,bugfix,hotfix,chore"
+bb config branch_format "{type}/{ticket}-{slug}"
+bb plugin:branch:new
+```
+
+Plugins load in both the source and the compiled PHAR build.
+
 ## Scripting
 
 Most read commands support `--json` for raw output and `--jq` to filter it:
