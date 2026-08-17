@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Http\Integrations\Bitbucket\Requests\ApiRequest;
+use App\Http\Integrations\Bitbucket\Requests\ApiRequestWithBody;
 
 class ApiCommand extends BitbucketCommand
 {
@@ -28,12 +29,15 @@ class ApiCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        $request = new ApiRequest(
-            method: (string) $this->option('method'),
-            endpoint: $this->normalizePath($this->argument('path')),
-            queryParams: $this->parsePairs($this->option('query')),
-            bodyData: $body,
-        );
+        $method = (string) $this->option('method');
+        $endpoint = $this->normalizePath($this->argument('path'));
+        $query = $this->parsePairs($this->option('query'));
+
+        // Only attach a body when there is one — Bitbucket's CDN answers 403
+        // to a GET that carries a JSON payload.
+        $request = $body === []
+            ? new ApiRequest($method, $endpoint, $query)
+            : new ApiRequestWithBody($method, $endpoint, $query, $body);
 
         $response = $this->send($request);
 
