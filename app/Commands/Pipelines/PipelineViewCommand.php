@@ -3,18 +3,22 @@
 namespace App\Commands\Pipelines;
 
 use App\Commands\BitbucketCommand;
+use App\Commands\Concerns\InteractsWithPipelines;
 use App\Http\Integrations\Bitbucket\Requests\Pipelines\GetPipeline;
-use App\Http\Integrations\Bitbucket\Requests\Pipelines\ListPipelineSteps;
 
 class PipelineViewCommand extends BitbucketCommand
 {
+    use InteractsWithPipelines;
+
     protected $signature = 'pipeline:view
-        {uuid : Pipeline UUID (with braces, as shown by the API)}
+        {pipeline? : Build number or UUID (defaults to the most recent pipeline)}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--branch= : When no pipeline is given, use the latest one on this branch}
+        {--web : Open the pipeline in a browser instead}
         {--json : Output raw JSON}
         {--jq= : Filter JSON output through a jq expression}';
 
-    protected $description = 'Show a pipeline and its steps';
+    protected $description = 'Show a pipeline, its steps and their timings';
 
     public function handle(): int
     {
@@ -27,48 +31,96 @@ class PipelineViewCommand extends BitbucketCommand
         }
 
         [$workspace, $slug] = $resolved;
-        $uuid = $this->argument('uuid');
 
-        $pipeline = $this->send(new GetPipeline($workspace, $slug, $uuid));
+        $ref = $this->resolvePipelineRef($workspace, $slug, $this->argument('pipeline'));
 
-        if ($pipeline === null) {
+        if ($ref === null) {
             return self::FAILURE;
         }
 
-        $steps = $this->collectAll(new ListPipelineSteps($workspace, $slug, $uuid));
+        $response = $this->send(new GetPipeline($workspace, $slug, $ref));
+
+        if ($response === null) {
+            return self::FAILURE;
+        }
+
+        $p = $response->json();
+        $url = $this->repoWebUrl($workspace, $slug).'/pipelines/results/'.($p['build_number'] ?? '');
+
+        if ($this->option('web')) {
+            $this->openInBrowser($url);
+
+            return self::SUCCESS;
+        }
+
+        $steps = $this->pipelineSteps($workspace, $slug, $ref);
 
         if ($steps === null) {
             return self::FAILURE;
         }
 
         if ($this->wantsJson()) {
-            return $this->outputJson(['pipeline' => $pipeline->json(), 'steps' => $steps]);
+            return $this->outputJson(['pipeline' => $p, 'steps' => $steps]);
         }
 
-        $p = $pipeline->json();
-        $url = $this->repoWebUrl($workspace, $slug).'/pipelines/results/'.($p['build_number'] ?? '');
+        $this->renderPipeline($p, $url);
+        $this->renderSteps($steps, (string) ($p['build_number'] ?? ''));
+
+        return $this->stateOf($p) === 'FAILED' ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $p
+     */
+    private function renderPipeline(array $p, string $url): void
+    {
+        $selector = data_get($p, 'target.selector.pattern')
+            ?? data_get($p, 'target.selector.type');
 
         $this->detail([
             'Build #' => $this->link($url, $p['build_number'] ?? ''),
-            'Status' => $this->badgeHtml($p['state']['result']['name'] ?? $p['state']['name'] ?? ''),
-            'Ref' => e($p['target']['ref_name'] ?? ''),
-            'Commit' => e(substr($p['target']['commit']['hash'] ?? '', 0, 8)),
-            'Trigger' => e($p['trigger']['name'] ?? ''),
-            'Created' => e(substr((string) ($p['created_on'] ?? ''), 0, 19)),
-            'Duration' => isset($p['duration_in_seconds']) ? $p['duration_in_seconds'].'s' : '',
+            'Status' => $this->badgeHtml($this->stateOf($p)),
+            'Ref' => e(trim(strtolower((string) data_get($p, 'target.ref_type', '')).' '.data_get($p, 'target.ref_name', ''))),
+            'Commit' => e(substr((string) data_get($p, 'target.commit.hash', ''), 0, 12)),
+            'Pipeline' => e((string) $selector),
+            'Trigger' => e((string) data_get($p, 'trigger.name', '')),
+            'Creator' => e((string) data_get($p, 'creator.display_name', '')),
+            'Created' => e($this->formatTimestamp($p['created_on'] ?? null, relative: true)),
+            'Completed' => e($this->formatTimestamp($p['completed_on'] ?? null)),
+            'Duration' => e($this->formatDuration($p['duration_in_seconds'] ?? null)),
+            'Build time' => isset($p['build_seconds_used']) && $p['build_seconds_used'] > 0
+                ? e($this->formatDuration($p['build_seconds_used']).' of build minutes')
+                : '',
+            'Run' => ($p['run_number'] ?? 1) > 1 ? e('#'.$p['run_number']) : '',
+            'Logs' => ($p['expired'] ?? false) ? e('expired — Bitbucket no longer keeps them') : '',
+            'UUID' => e((string) ($p['uuid'] ?? '')),
         ]);
+    }
 
-        if ($steps !== []) {
-            $rows = '';
-            foreach ($steps as $step) {
-                $rows .= '<div>'
-                    .$this->badgeHtml($step['state']['result']['name'] ?? $step['state']['name'] ?? '')
-                    .'<span class="ml-1">'.e($step['name'] ?? '(unnamed)').'</span>'
-                    .'</div>';
-            }
-            \Termwind\render('<div class="ml-1"><div class="font-bold">Steps</div>'.$rows.'</div>');
+    /**
+     * @param  array<int, array<string, mixed>>  $steps
+     */
+    private function renderSteps(array $steps, string $buildNumber): void
+    {
+        if ($steps === []) {
+            return;
         }
 
-        return self::SUCCESS;
+        $this->line(' <options=bold>Steps</>');
+
+        $this->table(
+            ['#', 'Status', 'Name', 'Duration', 'Started', 'Image'],
+            array_map(fn (array $step) => [
+                $step['_index'],
+                $this->badge($this->stateOf($step)),
+                $step['name'] ?? '(unnamed)',
+                $this->formatDuration($step['duration_in_seconds'] ?? null),
+                $this->formatTimestamp($step['started_on'] ?? null, format: 'H:i'),
+                data_get($step, 'image.name', 'default'),
+            ], $steps),
+        );
+
+        $this->line(" Step detail: <options=bold>bb pipeline:step {$buildNumber} 1</>"
+            ." · logs: <options=bold>bb pipeline:logs {$buildNumber} 1</>");
     }
 }

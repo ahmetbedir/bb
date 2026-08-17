@@ -8,6 +8,7 @@ use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequests;
 use App\Support\CredentialStore;
 use App\Support\GitContext;
 use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Support\Carbon;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
@@ -169,6 +170,109 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * The most specific state name of a pipeline, step or deployment.
+     * Bitbucket nests the interesting bit differently per object: a finished
+     * pipeline/step carries state.result, a deployment state.status, and a
+     * running pipeline only a stage.
+     *
+     * @param  array<string, mixed>  $node
+     */
+    protected function stateOf(array $node): string
+    {
+        return (string) (data_get($node, 'state.result.name')
+            ?? data_get($node, 'state.status.name')
+            ?? data_get($node, 'state.stage.name')
+            ?? data_get($node, 'state.name')
+            ?? '');
+    }
+
+    /**
+     * A UUID as a safe URL path segment. Bitbucket rejects UUIDs without
+     * braces, and braces must be percent-encoded — while numeric references
+     * (a pipeline build number) are passed through untouched.
+     */
+    protected function uuidSegment(int|string|null $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '' || ctype_digit($value) || str_contains($value, '%7B')) {
+            return $value;
+        }
+
+        return '%7B'.trim($value, '{}').'%7D';
+    }
+
+    /**
+     * A UUID reduced to its bare form (no braces, no percent-encoding, lower
+     * case) so references from different endpoints can be compared.
+     */
+    protected function bareUuid(int|string|null $value): string
+    {
+        return strtolower(trim(urldecode((string) $value), '{} '));
+    }
+
+    /**
+     * "2m 18s" / "1h 04m 12s" — a duration in seconds, human sized.
+     */
+    protected function formatDuration(int|float|null $seconds): string
+    {
+        if ($seconds === null) {
+            return '';
+        }
+
+        $seconds = (int) round((float) $seconds);
+
+        if ($seconds < 60) {
+            return "{$seconds}s";
+        }
+
+        if ($seconds < 3600) {
+            return intdiv($seconds, 60).'m '.str_pad((string) ($seconds % 60), 2, '0', STR_PAD_LEFT).'s';
+        }
+
+        return intdiv($seconds, 3600).'h '
+            .str_pad((string) intdiv($seconds % 3600, 60), 2, '0', STR_PAD_LEFT).'m '
+            .str_pad((string) ($seconds % 60), 2, '0', STR_PAD_LEFT).'s';
+    }
+
+    /**
+     * An API timestamp rendered in the local timezone, optionally with a
+     * relative suffix ("2026-08-17 11:05 (3 hours ago)").
+     */
+    protected function formatTimestamp(?string $timestamp, bool $relative = false, string $format = 'Y-m-d H:i'): string
+    {
+        if (blank($timestamp)) {
+            return '';
+        }
+
+        try {
+            $moment = Carbon::parse($timestamp)->setTimezone(date_default_timezone_get());
+        } catch (\Throwable) {
+            return substr($timestamp, 0, 19);
+        }
+
+        return $relative
+            ? $moment->format($format).' ('.$moment->diffForHumans().')'
+            : $moment->format($format);
+    }
+
+    /**
+     * The wall-clock seconds between two API timestamps (null if unknown).
+     */
+    protected function elapsedSeconds(?string $from, ?string $to): ?int
+    {
+        if (blank($from) || blank($to)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($from)->diffInSeconds(Carbon::parse($to), absolute: true);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Classify a Bitbucket state into a visual kind and a status symbol.
      *
      * @return array{0: string, 1: string} [kind, symbol]
@@ -178,8 +282,10 @@ abstract class BitbucketCommand extends Command
         return match (strtoupper($state)) {
             'SUCCESSFUL', 'MERGED', 'APPROVED', 'RESOLVED', 'COMPLETED' => ['ok', '✓'],
             'FAILED', 'ERROR', 'DECLINED' => ['bad', '✗'],
-            'STOPPED' => ['bad', '■'],
+            'STOPPED', 'HALTED' => ['bad', '■'],
             'INPROGRESS', 'IN_PROGRESS', 'RUNNING', 'BUILDING', 'PENDING', 'OPEN', 'NEW' => ['warn', '•'],
+            'PAUSED', 'READY' => ['warn', '❙❙'],
+            'NOT_RUN', 'SKIPPED', 'UNDEPLOYED', 'EXPIRED' => ['neutral', '–'],
             default => ['neutral', ''],
         };
     }
@@ -194,10 +300,10 @@ abstract class BitbucketCommand extends Command
         $label = trim("{$symbol} {$state}");
 
         return match ($kind) {
-            'ok' => parse('<span class="bg-green font-bold px-1 w-12"> '.e($label).' </span>'),
-            'bad' => parse('<span class="bg-red-600 font-bold px-1 w-12"> '.e($label).' </span>'),
-            'warn' => parse('<span class="bg-yellow-400 font-bold px-1 w-12"> '.e($label).' </span>'),
-            default => parse('<span class="bg-gray-500 font-bold px-1 w-12"> '.e($label).' </span>'),
+            'ok' => parse('<span class="bg-green font-bold px-1 w-15"> '.e($label).' </span>'),
+            'bad' => parse('<span class="bg-red-600 font-bold px-1 w-15"> '.e($label).' </span>'),
+            'warn' => parse('<span class="bg-yellow-400 font-bold px-1 w-15"> '.e($label).' </span>'),
+            default => parse('<span class="bg-gray-500 font-bold px-1 w-15"> '.e($label).' </span>'),
         };
     }
 

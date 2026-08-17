@@ -9,9 +9,14 @@ class ListPipelines extends Request
 {
     protected Method $method = Method::GET;
 
+    /**
+     * @param  array<string, string>  $filters  server-side filters, e.g.
+     *                                          ["target.branch" => "develop", "status" => "FAILED"]
+     */
     public function __construct(
         protected string $workspace,
         protected string $repoSlug,
+        protected array $filters = [],
     ) {}
 
     public function resolveEndpoint(): string
@@ -24,6 +29,7 @@ class ListPipelines extends Request
         return [
             'sort' => '-created_on',
             'pagelen' => 25,
+            ...$this->filters,
         ];
     }
 }

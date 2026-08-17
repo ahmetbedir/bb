@@ -3,17 +3,20 @@
 namespace App\Commands\Pipelines;
 
 use App\Commands\BitbucketCommand;
+use App\Commands\Concerns\InteractsWithPipelines;
 use App\Http\Integrations\Bitbucket\Requests\Pipelines\GetPipeline;
-use App\Http\Integrations\Bitbucket\Requests\Pipelines\ListPipelines;
 
 class PipelineWatchCommand extends BitbucketCommand
 {
+    use InteractsWithPipelines;
+
     protected $signature = 'pipeline:watch
-        {uuid? : Pipeline UUID (defaults to the most recent pipeline)}
+        {pipeline? : Build number or UUID (defaults to the most recent pipeline)}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--branch= : When no pipeline is given, watch the latest one on this branch}
         {--interval=5 : Seconds between polls}';
 
-    protected $description = 'Watch a pipeline until it finishes, then notify';
+    protected $description = 'Watch a pipeline step by step until it finishes, then notify';
 
     public function handle(): int
     {
@@ -27,17 +30,18 @@ class PipelineWatchCommand extends BitbucketCommand
 
         [$workspace, $slug] = $resolved;
 
-        $uuid = $this->argument('uuid') ?: $this->latestPipelineUuid($workspace, $slug);
+        $ref = $this->resolvePipelineRef($workspace, $slug, $this->argument('pipeline'));
 
-        if (blank($uuid)) {
+        if ($ref === null) {
             return self::FAILURE;
         }
 
         $interval = max(2, (int) $this->option('interval'));
-        $buildNumber = null;
+        $buildNumber = $this->resolvedBuildNumber;
+        $reported = [];
 
         while (true) {
-            $response = $this->send(new GetPipeline($workspace, $slug, $uuid));
+            $response = $this->send(new GetPipeline($workspace, $slug, $ref));
 
             if ($response === null) {
                 return self::FAILURE;
@@ -45,31 +49,61 @@ class PipelineWatchCommand extends BitbucketCommand
 
             $p = $response->json();
             $buildNumber ??= $p['build_number'] ?? '?';
-            $stateName = $p['state']['name'] ?? '';
-            $result = $p['state']['result']['name'] ?? null;
+
+            $this->reportSteps($workspace, $slug, $ref, $reported);
+
+            $stateName = data_get($p, 'state.name', '');
+            $result = data_get($p, 'state.result.name');
 
             if ($stateName === 'COMPLETED' || $result !== null) {
-                $this->line('  '.$this->badge($result ?? 'COMPLETED')." pipeline #{$buildNumber}");
+                $result = (string) ($result ?: 'COMPLETED');
+
+                $this->line('  '.$this->badge($result)." pipeline #{$buildNumber} in "
+                    .$this->formatDuration($p['duration_in_seconds'] ?? null));
                 $this->notify("Pipeline #{$buildNumber}", "Finished: {$result}");
+
+                if ($result !== 'SUCCESSFUL') {
+                    $this->line("  Logs: <options=bold>bb pipeline:logs {$buildNumber}</>");
+                }
 
                 return $result === 'SUCCESSFUL' ? self::SUCCESS : self::FAILURE;
             }
 
-            $this->line('  '.$this->badge($stateName)." pipeline #{$buildNumber} — polling every {$interval}s...");
+            $stage = data_get($p, 'state.stage.name');
+            $this->line('  '.$this->badge($stage ?: $stateName)." pipeline #{$buildNumber} — polling every {$interval}s...");
+
             sleep($interval);
         }
     }
 
-    private function latestPipelineUuid(string $workspace, string $slug): ?string
+    /**
+     * Print each step the moment it reaches a new state, so watching reads
+     * like a progress log rather than a repeated status line.
+     *
+     * @param  array<string, string>  $reported  step uuid => last printed state
+     */
+    private function reportSteps(string $workspace, string $slug, string $ref, array &$reported): void
     {
-        $pipelines = $this->collectAll(new ListPipelines($workspace, $slug), limit: 1);
+        $steps = $this->pipelineSteps($workspace, $slug, $ref);
 
-        if (blank($pipelines)) {
-            $this->error("No pipelines found in \"{$workspace}/{$slug}\".");
-
-            return null;
+        if ($steps === null || $steps === []) {
+            return;
         }
 
-        return $pipelines[0]['uuid'] ?? null;
+        foreach ($steps as $step) {
+            $uuid = (string) ($step['uuid'] ?? '');
+            $state = $this->stateOf($step);
+
+            if ($state === '' || ($reported[$uuid] ?? null) === $state) {
+                continue;
+            }
+
+            $reported[$uuid] = $state;
+
+            $duration = $this->formatDuration($step['duration_in_seconds'] ?? null);
+
+            $this->line('  '.$this->badge($state).' '.$step['_index'].'. '.($step['name'] ?? '(unnamed)')
+                .($duration !== '' ? " <fg=gray>({$duration})</>" : ''));
+        }
     }
 }

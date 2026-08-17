@@ -182,10 +182,49 @@ Commands taking `[id]` default to the open PR for the current branch when no id 
 ### Pipelines
 | Command | Description |
 |---|---|
-| `pipeline:list` | List recent pipelines (`--json`) |
-| `pipeline:view <uuid>` | Show a pipeline and its steps |
+| `pipeline:list` | List recent pipelines (`--branch`, `--status`, `--trigger`, `--pattern`, `--commit`, `--json`) |
+| `pipeline:view [pipeline]` | Show a pipeline, its steps and their timings (`--web`, `--json`) |
+| `pipeline:step [pipeline] [step]` | One step in full: state, timings, image, runner and its commands (`--setup`, `--teardown`) |
+| `pipeline:logs [pipeline] [step]` | Print or follow a step's build log (`--follow`, `--all`, `--tail`, `--grep`, `--output`) |
+| `pipeline:tests [pipeline] [step]` | Test report of a step (`--all`, `--reasons`) |
+| `pipeline:watch [pipeline]` | Follow a pipeline step by step, then notify |
 | `pipeline:run` | Trigger a run (`--branch`, `--pattern`) |
-| `pipeline:stop <uuid>` | Stop a running pipeline |
+| `pipeline:stop [pipeline]` | Stop a running pipeline |
+
+Every pipeline argument accepts a **build number** (`4879`), a **UUID** (with or
+without braces) or nothing at all — with no argument the most recent pipeline is
+used, narrowed by `--branch` when given. A step is picked by its number
+(`1`), a fragment of its name (`deploy`) or its UUID; commands that need one
+default to the failed step and otherwise ask.
+
+```bash
+bb pipeline:view                      # latest pipeline in this checkout
+bb pipeline:view --branch develop     # latest on develop
+bb pipeline:logs 4879 deploy --tail 50
+bb pipeline:logs --follow             # tail the running step live
+bb pipeline:step 4879 1 --setup       # including Bitbucket's own setup commands
+bb pipeline:logs 4879 --all --output build.log
+```
+
+### Deployments
+| Command | Description |
+|---|---|
+| `deployment:list` | List deployments newest first (`--environment`, `--status`, `--limit`, `--json`) |
+| `deployment:view [deployment]` | Full detail: release, commit, timings and the step that ran it (`--web`, `--json`) |
+| `deployment:logs [deployment]` | Print or follow the log of the deploying step (`--follow`, `--tail`, `--grep`, `--output`) |
+| `environment:list` | List environments with their lock, gate and restrictions |
+| `environment:view <environment>` | One environment: locks, restrictions, variables and recent deployments |
+
+Deployments are addressed by their number (`867`) or UUID, and default to the
+most recent one; environments by name, slug or UUID.
+
+```bash
+bb deployment:list -e production
+bb deployment:view                    # most recent deployment
+bb deployment:view -e staging         # most recent staging deployment
+bb deployment:logs 867 --grep error
+bb environment:view production
+```
 
 ### Other
 | Command | Description |
@@ -202,7 +241,8 @@ Commands taking `[id]` default to the open PR for the current branch when no id 
 
 - **Current-branch PRs** — `pr:show`, `pr:diff`, `pr:checks` work with no id inside a checkout; they resolve the open PR for the current branch.
 - **`pr:create --fill`** — fills title/description from the branch commits.
-- **Watch + notify** — `pipeline:watch [uuid]` and `pr:checks --watch` poll until done and fire a desktop notification.
+- **Watch + notify** — `pipeline:watch [pipeline]` and `pr:checks --watch` poll until done and fire a desktop notification.
+- **Live logs** — `pipeline:logs --follow` fetches only the bytes appended since the last poll (HTTP range requests), so tailing a running build is cheap.
 - **Aliases** — `bb alias co pr:checkout`, then `bb co 42`.
 - **Pager** — long `pr:diff` output is paged through `$PAGER`/less on a TTY (disable with `bb config pager off`).
 - **Rate limits** — HTTP 429 responses are retried with backoff (honouring `Retry-After`).

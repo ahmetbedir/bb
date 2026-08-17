@@ -3,13 +3,17 @@
 namespace App\Commands\Pipelines;
 
 use App\Commands\BitbucketCommand;
+use App\Commands\Concerns\InteractsWithPipelines;
 use App\Http\Integrations\Bitbucket\Requests\Pipelines\StopPipeline;
 
 class PipelineStopCommand extends BitbucketCommand
 {
+    use InteractsWithPipelines;
+
     protected $signature = 'pipeline:stop
-        {uuid : Pipeline UUID}
-        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}';
+        {pipeline? : Build number or UUID (defaults to the most recent pipeline)}
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--branch= : When no pipeline is given, stop the latest one on this branch}';
 
     protected $description = 'Stop a running pipeline';
 
@@ -24,15 +28,18 @@ class PipelineStopCommand extends BitbucketCommand
         }
 
         [$workspace, $slug] = $resolved;
-        $uuid = $this->argument('uuid');
 
-        $response = $this->send(new StopPipeline($workspace, $slug, $uuid));
+        $ref = $this->resolvePipelineRef($workspace, $slug, $this->argument('pipeline'));
 
-        if ($response === null) {
+        if ($ref === null) {
             return self::FAILURE;
         }
 
-        $this->info("Stopped pipeline {$uuid}.");
+        if ($this->send(new StopPipeline($workspace, $slug, $ref)) === null) {
+            return self::FAILURE;
+        }
+
+        $this->info('Stopped pipeline '.($this->resolvedBuildNumber ? '#'.$this->resolvedBuildNumber : $ref).'.');
 
         return self::SUCCESS;
     }
