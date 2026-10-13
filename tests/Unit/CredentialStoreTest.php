@@ -11,14 +11,15 @@ it('is not configured when empty', function () {
     expect(tempStore()->isConfigured())->toBeFalse();
 });
 
-it('is configured with an app password', function () {
+it('treats a retired app password config as not configured', function () {
     $store = tempStore()->fill([
         'method' => 'app_password',
         'username' => 'jane',
         'app_password' => 'secret',
     ]);
 
-    expect($store->isConfigured())->toBeTrue();
+    expect($store->isConfigured())->toBeFalse()
+        ->and($store->usesAppPassword())->toBeTrue();
 });
 
 it('is configured with a token', function () {

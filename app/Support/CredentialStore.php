@@ -9,8 +9,12 @@ use Illuminate\Support\Arr;
  * directory (~/.config/bb/config.json by default).
  *
  * Supported auth methods:
- *   - "app_password": Basic auth using username + Bitbucket App Password
- *   - "token":        Bearer auth using an Access/API token
+ *   - "token": Bearer auth using an Atlassian API token or a
+ *              repository/workspace/project access token
+ *   - "oauth": Bearer auth using an OAuth access token (`bb auth login`)
+ *
+ * The old "app_password" method is no longer accepted: Bitbucket retired
+ * app passwords in 2026, so such configs count as not configured.
  */
 class CredentialStore
 {
@@ -63,11 +67,18 @@ class CredentialStore
     public function isConfigured(): bool
     {
         return match ($this->get('method')) {
-            'app_password' => filled($this->get('username')) && filled($this->get('app_password')),
             'token' => filled($this->get('token')),
             'oauth' => filled($this->get('oauth.access_token')),
             default => false,
         };
+    }
+
+    /**
+     * Whether the stored config still uses a retired app password.
+     */
+    public function usesAppPassword(): bool
+    {
+        return $this->get('method') === 'app_password';
     }
 
     public function all(): array

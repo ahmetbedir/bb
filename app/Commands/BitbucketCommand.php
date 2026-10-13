@@ -452,9 +452,16 @@ abstract class BitbucketCommand extends Command
             return true;
         }
 
-        $this->error('bb is not configured yet. Run: bb configure');
+        $this->error($this->notConfiguredMessage());
 
         return false;
+    }
+
+    protected function notConfiguredMessage(): string
+    {
+        return $this->credentials()->usesAppPassword()
+            ? 'Bitbucket no longer accepts app passwords. Create an API token and run: bb configure'
+            : 'bb is not configured yet. Run: bb configure';
     }
 
     /**
@@ -858,7 +865,6 @@ abstract class BitbucketCommand extends Command
         $store = $this->credentials();
 
         return match ($store->get('method')) {
-            'app_password' => [(string) $store->get('username'), (string) $store->get('app_password')],
             'token' => ['x-token-auth', (string) $store->get('token')],
             'oauth' => ['x-token-auth', (string) $store->get('oauth.access_token')],
             default => null,

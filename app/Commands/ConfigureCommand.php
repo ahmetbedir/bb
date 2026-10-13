@@ -5,14 +5,12 @@ namespace App\Commands;
 use App\Http\Integrations\Bitbucket\Requests\CurrentUser;
 
 use function Laravel\Prompts\password;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 class ConfigureCommand extends BitbucketCommand
 {
     protected $signature = 'configure
-        {--method= : Authentication method: app_password or token}
-        {--username= : Bitbucket username (for app_password)}
+        {--method=token : Authentication method (only "token" is supported)}
         {--workspace= : Default workspace to use when none is given}';
 
     protected $description = 'Configure Bitbucket credentials for bb';
@@ -21,48 +19,24 @@ class ConfigureCommand extends BitbucketCommand
     {
         $store = $this->credentials();
 
-        $this->line('Configure your Bitbucket Cloud credentials.');
-        $this->newLine();
-
-        $method = $this->option('method') ?: select(
-            label: 'Authentication method',
-            options: [
-                'app_password' => 'App Password (username + app password)',
-                'token' => 'Access / API token (Bearer)',
-            ],
-            default: $store->get('method', 'app_password'),
-        );
-
-        if (! in_array($method, ['app_password', 'token'], true)) {
-            $this->error("Invalid method \"{$method}\". Use app_password or token.");
+        if ($this->option('method') !== 'token') {
+            $this->error('Invalid method "'.$this->option('method').'". Bitbucket retired app passwords; use an API token.');
 
             return self::FAILURE;
         }
 
-        $store->set('method', $method);
+        $this->line('Configure your Bitbucket Cloud credentials.');
+        $this->newLine();
 
-        if ($method === 'app_password') {
-            $username = $this->option('username') ?: text(
-                label: 'Bitbucket username',
-                default: (string) $store->get('username', ''),
-                required: true,
-            );
+        $token = password(
+            label: 'API / access token',
+            hint: 'Create an API token with Bitbucket scopes at id.atlassian.com → Security → API tokens',
+            required: true,
+        );
 
-            $appPassword = password(
-                label: 'App password',
-                hint: 'Create one at Bitbucket → Personal settings → App passwords',
-                required: true,
-            );
-
-            $store->fill(['username' => $username, 'app_password' => $appPassword]);
-        } else {
-            $token = password(
-                label: 'Access / API token',
-                required: true,
-            );
-
-            $store->set('token', $token);
-        }
+        // Drop leftovers from the retired app password method.
+        $store->forget('username')->forget('app_password');
+        $store->fill(['method' => 'token', 'token' => $token]);
 
         $workspace = $this->option('workspace') ?: text(
             label: 'Default workspace (optional)',

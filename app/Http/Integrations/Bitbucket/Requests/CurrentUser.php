@@ -6,8 +6,8 @@ use Saloon\Enums\Method;
 use Saloon\Http\Request;
 
 /**
- * Returns the authenticated account (GET /user). Requires the "account"
- * scope on the app password / token.
+ * Returns the authenticated account (GET /user). Requires the
+ * "read:user:bitbucket" scope on the API token.
  */
 class CurrentUser extends Request
 {

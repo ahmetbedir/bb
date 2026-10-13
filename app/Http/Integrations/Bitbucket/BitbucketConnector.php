@@ -5,7 +5,6 @@ namespace App\Http\Integrations\Bitbucket;
 use App\Support\CredentialStore;
 use Saloon\Contracts\Authenticator;
 use Saloon\Helpers\OAuth2\OAuthConfig;
-use Saloon\Http\Auth\BasicAuthenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
 use Saloon\Http\PendingRequest;
@@ -50,10 +49,6 @@ class BitbucketConnector extends Connector
     protected function defaultAuth(): ?Authenticator
     {
         return match ($this->credentials->get('method')) {
-            'app_password' => new BasicAuthenticator(
-                (string) $this->credentials->get('username'),
-                (string) $this->credentials->get('app_password'),
-            ),
             'token' => new TokenAuthenticator(
                 (string) $this->credentials->get('token'),
             ),

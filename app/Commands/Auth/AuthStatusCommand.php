@@ -16,7 +16,9 @@ class AuthStatusCommand extends BitbucketCommand
         $store = $this->credentials();
 
         if (! $store->isConfigured()) {
-            $this->warn('Not logged in. Run "bb auth login" or "bb configure".');
+            $this->warn($store->usesAppPassword()
+                ? $this->notConfiguredMessage()
+                : 'Not logged in. Run "bb auth login" or "bb configure".');
 
             return self::FAILURE;
         }
@@ -24,10 +26,6 @@ class AuthStatusCommand extends BitbucketCommand
         $method = $store->get('method');
         $this->line("Config file: <comment>{$store->path()}</comment>");
         $this->line('Auth method: <comment>'.$this->methodLabel($method).'</comment>');
-
-        if ($method === 'app_password') {
-            $this->line('Username: <comment>'.$store->get('username').'</comment>');
-        }
 
         if ($method === 'oauth' && filled($expiresAt = $store->get('oauth.expires_at'))) {
             $expired = time() >= (int) $expiresAt;
@@ -58,8 +56,7 @@ class AuthStatusCommand extends BitbucketCommand
     private function methodLabel(?string $method): string
     {
         return match ($method) {
-            'app_password' => 'App Password',
-            'token' => 'Access / API token',
+            'token' => 'API / access token',
             'oauth' => 'OAuth',
             default => (string) $method,
         };

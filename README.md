@@ -67,14 +67,20 @@ bb auth login
 
 Tokens are refreshed automatically when they expire.
 
-### App password / API token
+### API token
+
+Bitbucket retired app passwords in 2026. Create an
+[API token with scopes](https://id.atlassian.com/manage-profile/security/api-tokens)
+(choose **Bitbucket** as the app), then:
 
 ```bash
 bb configure
 ```
 
-- **App password**: username + an [app password](https://bitbucket.org/account/settings/app-passwords/).
-- **API / access token**: sent as a Bearer token.
+The token is sent as a Bearer token, and `bb auth setup-git` uses it for git
+over HTTPS. Repository, project and workspace access tokens work the same way.
+Grant at least `read:user:bitbucket` plus the read/write scopes for the commands
+you use (repositories, pull requests, pipelines, issues).
 
 Credentials are stored in `~/.config/bb/config.json` (mode `0600`).
 
