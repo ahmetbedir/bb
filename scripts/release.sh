@@ -24,7 +24,8 @@ echo "==> Releasing $VERSION to $REPO"
 echo "==> Building PHAR"
 # Bake the v-prefixed tag (e.g. v1.0.4) so `bb --version` matches the git tag
 # and the local-install build. The Homebrew formula still uses the v-less form.
-php bb app:build bb.phar --build-version="$VERSION" --no-interaction >/dev/null
+# Without dev dependencies; dev ones (incl. phpacker below) are restored after.
+scripts/build-phar.sh bb.phar "$VERSION"
 
 echo "==> Cross-building all platforms with phpacker"
 ./vendor/bin/phpacker build all --no-interaction >/dev/null

@@ -16,6 +16,7 @@ composer test      # vendor/bin/pest
 composer lint      # vendor/bin/pint --test
 composer format    # vendor/bin/pint
 ./bb list          # every command; ./bb list --format=json for machine output
+scripts/build-phar.sh bb v1.2.3   # release PHAR without dev deps (never call app:build directly)
 ```
 
 Run `composer test` before finishing any change. Laravel PAO (dev dependency)
