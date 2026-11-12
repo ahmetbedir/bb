@@ -49,7 +49,7 @@ composer install
 php bb <command>
 ```
 
-Requires PHP 8.2+. To produce the native binaries + Homebrew formula locally:
+Requires PHP 8.3+. To produce the native binaries + Homebrew formula locally:
 
 ```bash
 scripts/release.sh v1.0.2   # builds dist/release/bb-* and dist/release/bb.rb
