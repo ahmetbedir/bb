@@ -18,6 +18,11 @@ VERSION="${1:-}"
 cd "$(dirname "$0")/.."
 
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+
+# phpacker downloads PHP binaries through the GitHub API. Unauthenticated
+# that is 60 requests an hour, easily used up; authenticate with gh's token.
+GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}"
+export GITHUB_TOKEN
 ver_no_v="${VERSION#v}"
 echo "==> Releasing $VERSION to $REPO"
 
