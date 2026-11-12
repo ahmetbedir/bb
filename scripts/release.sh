@@ -73,10 +73,6 @@ class Bb < Formula
   version "$ver_no_v"
 
   on_macos do
-    # Lets desktop notifications show bb's icon (JoliNotif passes it as
-    # -contentImage); the built-in AppleScript fallback ignores icons.
-    depends_on "terminal-notifier"
-
     on_arm do
       url "$base/bb-macos-arm64"
       sha256 "$(sha "$dist/bb-macos-arm64")"

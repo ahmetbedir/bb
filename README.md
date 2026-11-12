@@ -39,10 +39,6 @@ curl -fsSL https://github.com/ahmetbedir/bb/releases/latest/download/install.sh 
 irm https://github.com/ahmetbedir/bb/releases/latest/download/install.ps1 | iex
 ```
 
-On macOS, `brew install terminal-notifier` lets desktop notifications
-(`pipeline:watch`, `pr:checks --watch`) show bb's icon. Homebrew installs it
-for you.
-
 ### From source (development)
 
 ```bash
