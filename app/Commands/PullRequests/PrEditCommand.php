@@ -12,7 +12,9 @@ class PrEditCommand extends BitbucketCommand
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--title= : New title}
         {--description= : New description}
-        {--dest= : New destination branch}';
+        {--dest= : New destination branch}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Edit a pull request (title, description, destination)';
 
@@ -53,6 +55,10 @@ class PrEditCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Updated PR #{$id}.");

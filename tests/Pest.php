@@ -51,7 +51,7 @@ expect()->extend('toBeOne', function () {
  * @param  array<string, mixed>  $parameters
  * @return array{0: int, 1: string}
  */
-function runCommand(string $command, array $parameters = []): array
+function runCommand(string $command, array $parameters = [], bool $decorated = true): array
 {
     // A headless test has no real terminal; pin a wide width so table sizing
     // is deterministic (mirrors a normal-width terminal, not an 80-col squeeze).
@@ -59,7 +59,8 @@ function runCommand(string $command, array $parameters = []): array
 
     // Decorated so Laravel Prompts treats ANSI / OSC 8 escapes as zero-width
     // when sizing tables — mirroring a real terminal.
-    $buffer = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+    // Pass $decorated = false to mimic piped output (scripts, agents).
+    $buffer = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, $decorated);
     $code = app(Kernel::class)->call($command, $parameters, $buffer);
 
     return [$code, $buffer->fetch()];

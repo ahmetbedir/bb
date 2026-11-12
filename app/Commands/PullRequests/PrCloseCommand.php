@@ -10,7 +10,9 @@ class PrCloseCommand extends BitbucketCommand
     protected $signature = 'pr:close
         {id : Pull request id}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--yes : Skip the confirmation prompt}';
+        {--yes : Skip the confirmation prompt}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Decline (close) a pull request';
 
@@ -37,6 +39,10 @@ class PrCloseCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Declined PR #{$id}.");

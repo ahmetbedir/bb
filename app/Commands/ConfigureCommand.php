@@ -52,17 +52,28 @@ class ConfigureCommand extends BitbucketCommand
         $store->save();
 
         $this->newLine();
-        $this->task('Verifying credentials', fn () => $this->verify());
+        $verified = false;
+        $this->task('Verifying credentials', function () use (&$verified) {
+            return $verified = $this->verify();
+        });
 
         $this->newLine();
         $this->info("Saved to {$store->path()}");
 
-        return self::SUCCESS;
+        // Saved either way, but a token Bitbucket rejects is not a success.
+        return $verified ? self::SUCCESS : self::FAILURE;
     }
 
     private function verify(): bool
     {
-        $response = $this->connector()->send(new CurrentUser);
+        try {
+            $response = $this->connector()->send(new CurrentUser);
+        } catch (\Throwable $e) {
+            $this->newLine();
+            $this->warn('Could not verify credentials ('.$e->getMessage().'). They were saved anyway.');
+
+            return false;
+        }
 
         if ($response->failed()) {
             $this->newLine();

@@ -19,7 +19,9 @@ class PrCreateCommand extends BitbucketCommand
         {--description= : Pull request description}
         {--fill : Fill title and description from the branch commits}
         {--close-source-branch : Close the source branch after merge}
-        {--web : Open the created pull request in a browser}';
+        {--web : Open the created pull request in a browser}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Create a pull request';
 
@@ -83,6 +85,11 @@ class PrCreateCommand extends BitbucketCommand
         }
 
         $pr = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $this->info("Created PR #{$pr['id']}: {$pr['title']}");
         $url = $pr['links']['html']['href'] ?? '';
         $this->line(' '.$url);

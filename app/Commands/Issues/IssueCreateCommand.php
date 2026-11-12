@@ -14,7 +14,9 @@ class IssueCreateCommand extends BitbucketCommand
         {--title= : Issue title}
         {--content= : Issue description (raw markdown)}
         {--kind=bug : bug, enhancement, proposal or task}
-        {--priority=major : trivial, minor, major, critical or blocker}';
+        {--priority=major : trivial, minor, major, critical or blocker}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Create an issue';
 
@@ -46,6 +48,11 @@ class IssueCreateCommand extends BitbucketCommand
         }
 
         $issue = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $this->info("Created issue #{$issue['id']}: {$issue['title']}");
         $this->line(' '.($issue['links']['html']['href'] ?? ''));
 

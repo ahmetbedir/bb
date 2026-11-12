@@ -12,7 +12,9 @@ class RepoCreateCommand extends BitbucketCommand
         {--description= : Repository description}
         {--public : Make the repository public (default: private)}
         {--project= : Project key to place the repository in}
-        {--clone : Clone the repository after creating it}';
+        {--clone : Clone the repository after creating it}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Create a new repository';
 
@@ -41,6 +43,11 @@ class RepoCreateCommand extends BitbucketCommand
         }
 
         $repo = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $this->info("Created {$repo['full_name']}");
         $this->line(' '.($repo['links']['html']['href'] ?? ''));
 

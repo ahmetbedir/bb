@@ -9,7 +9,9 @@ class PrApproveCommand extends BitbucketCommand
 {
     protected $signature = 'pr:approve
         {id : Pull request id}
-        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}';
+        {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Approve a pull request';
 
@@ -30,6 +32,10 @@ class PrApproveCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Approved PR #{$id}.");

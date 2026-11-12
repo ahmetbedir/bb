@@ -11,7 +11,9 @@ class PrRequestChangesCommand extends BitbucketCommand
     protected $signature = 'pr:request-changes
         {id : Pull request id}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--body= : Optional comment to leave with the review}';
+        {--body= : Optional comment to leave with the review}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Request changes on a pull request';
 
@@ -38,6 +40,10 @@ class PrRequestChangesCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Requested changes on PR #{$id}.");

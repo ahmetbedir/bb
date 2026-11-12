@@ -302,22 +302,66 @@ bb branch:new
 
 Plugins load in both the source and the compiled PHAR build.
 
-## Scripting
+## Scripting and AI agents
 
-Most read commands support `--json` for raw output and `--jq` to filter it:
+Read and write commands support `--json` for raw output and `--jq` to filter
+it (`--jq` alone implies `--json`):
 
 ```bash
-bb repo:list acme --json --jq='.[].slug'
-bb pr:list -R acme/api --json --jq='.[] | select(.state=="OPEN") | .title'
-bb api /repositories/acme/api --jq='.mainbranch.name'
+bb repo:list acme --jq='.[].slug'
+bb pr:list -R acme/api --jq='.[] | select(.state=="OPEN") | .title'
+bb pr:create -R acme/api -n --title "Fix X" --source fix/x --jq '.id'
+bb api /repositories/acme/api/refs/branches --paginate --jq='.[].name'
 ```
+
+Behaviour that makes `bb` safe to drive from scripts and agents:
+
+- `BB_TOKEN` (and optionally `BB_WORKSPACE`) authenticate without a config
+  file; the token is never written to disk.
+- Errors and warnings go to stderr; with `--json`, API errors are a JSON
+  object (`{"error":{"status":404,"message":"..."}}`). Exit code is `1`
+  whenever the action did not happen.
+- When nobody can answer a prompt (piped stdin or `-n`), `bb` fails instead of
+  assuming an answer. Pass `--yes` to `pr:merge`, `pr:close`, `branch:delete`,
+  `repo:delete` and `auth:logout` to confirm explicitly. Unattended runs also
+  need `--yes` for `pipeline:run`, `pipeline:stop` and non-GET `bb api` calls;
+  `repo:edit --public` and `plugin:install` always ask (or take `--yes`).
+- `--jq` is validated before any request is sent.
+- Piped tables are tab-separated with no colours or hyperlinks.
+- AI agents are detected from their environment (via `laravel/agent-detector`)
+  and get the piped, non-interactive behaviour even when they run `bb` in a
+  pseudo-terminal. Set `BB_AGENT=0` to turn this off, or `BB_AGENT=1` to force it.
+
+Give your AI agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI and
+[others](https://skills.sh)) the bb skill, which teaches it these conventions:
+
+```bash
+bb skill:install -g               # -g: every project; drop it for this project only
+bb skill:install -g -a claude-code -a cursor   # only these agents
+```
+
+`bb skill:install` runs [skills.sh](https://skills.sh)'s `npx skills add`,
+pinned to your bb version so the skill matches the flags your binary has.
+Without Node.js it copies the skill into Claude Code's skills directory instead.
+
+A global install (`-g`) follows bb upgrades: after `brew upgrade bb`, the
+first `bb` command reinstalls the skill for the new version once (a note goes
+to stderr). Turn this off with `bb config skill_auto_update off`. Project
+installs and explicit `--ref` pins are left alone. When an agent runs bb and
+the skill is not installed, bb prints a one-time tip to stderr suggesting
+`bb skill:install -g`; it never installs anything on its own. If you installed with
+`npx skills add ahmetbedir/bb` directly, update with `npx skills update`.
+
+The skill lives in [`skills/bb/SKILL.md`](skills/bb/SKILL.md). Contributors:
+see [`AGENTS.md`](AGENTS.md).
 
 ## Development
 
 ```bash
 composer install
-vendor/bin/pest        # run the test suite
-vendor/bin/pint        # format code
+composer test          # run the test suite (Pest)
+composer lint          # check formatting (Pint)
+composer format        # format code
 ```
 
 ## License

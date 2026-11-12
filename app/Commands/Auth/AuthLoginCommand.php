@@ -67,6 +67,14 @@ class AuthLoginCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
+        // Saloon skips the state check when the callback omits "state", so
+        // require it here: a code we did not ask for must never be exchanged.
+        if (! is_string($callback['state'] ?? null) || ! hash_equals((string) $expectedState, $callback['state'])) {
+            $this->error('Authorization failed: the OAuth state did not match. Run "bb auth login" again.');
+
+            return self::FAILURE;
+        }
+
         if (! isset($callback['code'])) {
             $this->error('Authorization failed: '.($callback['error_description'] ?? $callback['error'] ?? 'no code returned'));
 

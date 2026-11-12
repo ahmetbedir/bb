@@ -29,7 +29,8 @@ class AuthGitCredentialCommand extends BitbucketCommand
         $attributes = $this->readAttributes();
 
         // Only answer for Bitbucket Cloud over https.
-        if (($attributes['host'] ?? null) !== 'bitbucket.org') {
+        // Never hand the token out over plain http.
+        if (($attributes['host'] ?? null) !== 'bitbucket.org' || ($attributes['protocol'] ?? null) !== 'https') {
             return self::SUCCESS;
         }
 

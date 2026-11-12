@@ -11,7 +11,10 @@ class PipelineRunCommand extends BitbucketCommand
     protected $signature = 'pipeline:run
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--branch= : Branch to run the pipeline on (defaults to the current git branch)}
-        {--pattern= : Run a custom pipeline definition by name}';
+        {--pattern= : Run a custom pipeline definition by name}
+        {--y|yes : Confirm the action when running non-interactively (scripts, agents)}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Trigger a pipeline run';
 
@@ -35,6 +38,10 @@ class PipelineRunCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
+        if (! $this->allowUnattended("Running a pipeline on \"{$branch}\"")) {
+            return self::FAILURE;
+        }
+
         $response = $this->send(new RunPipeline($workspace, $slug, $branch, $this->option('pattern') ?: null));
 
         if ($response === null) {
@@ -42,6 +49,11 @@ class PipelineRunCommand extends BitbucketCommand
         }
 
         $p = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $number = $p['build_number'] ?? '?';
         $this->info("Started pipeline #{$number} on \"{$branch}\".");
         $this->line(' '.$this->repoWebUrl($workspace, $slug)."/pipelines/results/{$number}");

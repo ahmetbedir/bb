@@ -9,7 +9,8 @@ class PluginInstallCommand extends BitbucketCommand
 {
     protected $signature = 'plugin:install
         {source : Git URL, GitHub gist (gist:<id> or a gist URL), or a local .php file / directory}
-        {--name= : Install under this name (defaults to the source name)}';
+        {--name= : Install under this name (defaults to the source name)}
+        {--y|yes : Skip the confirmation prompt}';
 
     protected $description = 'Install a plugin into ~/.config/bb/plugins';
 
@@ -17,13 +18,21 @@ class PluginInstallCommand extends BitbucketCommand
     {
         $dir = CredentialStore::pluginsPath();
 
-        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
-            $this->error("Could not create plugins directory: {$dir}");
+        $source = $this->argument('source');
+
+        // A plugin is PHP that runs inside every later bb command: never install
+        // one without an explicit yes (agents could be talked into it).
+        if (! $this->option('yes') && ! $this->confirm("Install plugin from \"{$source}\"? Its code will run on every bb command.", false)) {
+            $this->line('Aborted.');
 
             return self::FAILURE;
         }
 
-        $source = $this->argument('source');
+        if (! is_dir($dir) && ! mkdir($dir, 0700, true) && ! is_dir($dir)) {
+            $this->error("Could not create plugins directory: {$dir}");
+
+            return self::FAILURE;
+        }
 
         if ($gist = $this->gistTarget($source)) {
             return $this->installFromGit($dir, $gist['url'], $gist['name']);
@@ -53,7 +62,7 @@ class PluginInstallCommand extends BitbucketCommand
 
         $id = trim($id);
 
-        if ($id === '') {
+        if (! preg_match('/^[A-Za-z0-9]+$/', $id)) {
             return null;
         }
 
@@ -73,6 +82,11 @@ class PluginInstallCommand extends BitbucketCommand
     private function installFromGit(string $dir, string $source, ?string $name = null): int
     {
         $name = $this->option('name') ?: $name ?: preg_replace('/\.git$/', '', basename($source));
+
+        if (! $this->validName($name)) {
+            return self::FAILURE;
+        }
+
         $target = "{$dir}/{$name}";
 
         if (is_dir($target)) {
@@ -83,7 +97,8 @@ class PluginInstallCommand extends BitbucketCommand
 
         $this->line("Cloning {$source} into {$name}...");
 
-        if (! $this->git(['clone', '--depth', '1', $source, $target])) {
+        // "--" so a source like "--upload-pack=..." can't be read as an option.
+        if (! $this->git(['clone', '--depth', '1', '--', $source, $target])) {
             return self::FAILURE;
         }
 
@@ -100,13 +115,27 @@ class PluginInstallCommand extends BitbucketCommand
 
         if (is_file($source)) {
             $name = $this->option('name') ?: basename($source);
-            copy($source, "{$dir}/{$name}");
+
+            if (! $this->validName($name)) {
+                return self::FAILURE;
+            }
+
+            if (! copy($source, "{$dir}/{$name}")) {
+                $this->error("Could not copy {$source}.");
+
+                return self::FAILURE;
+            }
 
             return $this->done($name);
         }
 
         // Directory — copy it under the plugins folder.
         $name = $this->option('name') ?: basename(rtrim($source, '/'));
+
+        if (! $this->validName($name)) {
+            return self::FAILURE;
+        }
+
         $target = "{$dir}/{$name}";
 
         if (is_dir($target)) {
@@ -125,6 +154,21 @@ class PluginInstallCommand extends BitbucketCommand
         }
 
         return $this->done($name);
+    }
+
+    /**
+     * Plugin names become paths under the plugins directory: no separators,
+     * no "..", no hidden files.
+     */
+    private function validName(string $name): bool
+    {
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $name) && ! str_contains($name, '..')) {
+            return true;
+        }
+
+        $this->error("Invalid plugin name \"{$name}\". Use letters, digits, \".\", \"_\" or \"-\" (pass --name).");
+
+        return false;
     }
 
     private function done(string $name): int

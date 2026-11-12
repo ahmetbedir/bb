@@ -19,6 +19,19 @@ class BitbucketConnector extends Connector
 
     public function __construct(protected CredentialStore $credentials)
     {
+        // Ids, slugs and branch names from the command line go straight into
+        // request paths. A "." or ".." segment (raw or percent-encoded) could
+        // retarget a write at a different endpoint, so refuse it outright.
+        $this->middleware()->onRequest(function (PendingRequest $request) {
+            $path = (string) parse_url($request->getUrl(), PHP_URL_PATH);
+
+            foreach (explode('/', $path) as $segment) {
+                if (in_array(rawurldecode($segment), ['.', '..'], true)) {
+                    throw new \InvalidArgumentException('Invalid path in request (contains "." or ".."): '.$path);
+                }
+            }
+        });
+
         // BB_DEBUG=1 traces every request/response to STDERR.
         if (getenv('BB_DEBUG')) {
             $this->middleware()->onRequest(function (PendingRequest $request) {

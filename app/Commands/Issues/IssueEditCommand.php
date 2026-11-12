@@ -13,7 +13,9 @@ class IssueEditCommand extends BitbucketCommand
         {--title= : New title}
         {--content= : New description (raw markdown)}
         {--kind= : bug, enhancement, proposal or task}
-        {--priority= : trivial, minor, major, critical or blocker}';
+        {--priority= : trivial, minor, major, critical or blocker}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Edit an issue';
 
@@ -58,6 +60,10 @@ class IssueEditCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Updated issue #{$id}.");

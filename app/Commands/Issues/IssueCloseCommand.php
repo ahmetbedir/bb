@@ -10,7 +10,9 @@ class IssueCloseCommand extends BitbucketCommand
     protected $signature = 'issue:close
         {id : Issue id}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--state=resolved : Closing state: resolved, closed, wontfix, invalid or duplicate}';
+        {--state=resolved : Closing state: resolved, closed, wontfix, invalid or duplicate}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Close an issue';
 
@@ -32,6 +34,10 @@ class IssueCloseCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Issue #{$id} set to \"{$state}\".");

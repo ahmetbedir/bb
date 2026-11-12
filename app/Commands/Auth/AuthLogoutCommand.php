@@ -7,7 +7,8 @@ use App\Commands\BitbucketCommand;
 class AuthLogoutCommand extends BitbucketCommand
 {
     protected $signature = 'auth:logout
-        {--keep-workspace : Keep the configured default workspace}';
+        {--keep-workspace : Keep the configured default workspace}
+        {--y|yes : Skip the confirmation prompt}';
 
     protected $description = 'Remove stored Bitbucket credentials';
 
@@ -21,7 +22,7 @@ class AuthLogoutCommand extends BitbucketCommand
             return self::SUCCESS;
         }
 
-        if (! $this->confirm('Remove stored Bitbucket credentials?', true)) {
+        if (! $this->option('yes') && ! $this->confirm('Remove stored Bitbucket credentials?', true)) {
             $this->line('Aborted.');
 
             return self::SUCCESS;

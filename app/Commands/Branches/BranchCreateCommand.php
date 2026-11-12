@@ -12,7 +12,9 @@ class BranchCreateCommand extends BitbucketCommand
     protected $signature = 'branch:create
         {name? : New branch name}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--from= : Source branch name or commit hash to branch from}';
+        {--from= : Source branch name or commit hash to branch from}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Create a branch';
 
@@ -38,6 +40,11 @@ class BranchCreateCommand extends BitbucketCommand
         }
 
         $branch = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $this->info("Created branch \"{$branch['name']}\" at ".substr($branch['target']['hash'] ?? '', 0, 8));
 
         return self::SUCCESS;

@@ -32,28 +32,49 @@ class OAuthCallbackServer
             throw new RuntimeException("Could not start local server on {$this->host}:{$this->port} — {$errstr} ({$errno}). Is the port free?");
         }
 
-        try {
-            $client = @stream_socket_accept($server, $this->timeout);
+        $deadline = time() + $this->timeout;
 
-            if ($client === false) {
-                throw new RuntimeException('Timed out waiting for the browser redirect.');
+        try {
+            // Keep serving until the real redirect arrives: a favicon request,
+            // a stray local connection or a slow client must not end the login.
+            while (($remaining = $deadline - time()) > 0) {
+                $client = @stream_socket_accept($server, $remaining);
+
+                if ($client === false) {
+                    break;
+                }
+
+                stream_set_timeout($client, 5);
+                $requestLine = fgets($client) ?: '';
+                $query = $this->parseQuery($requestLine);
+
+                if (! isset($query['code']) && ! isset($query['error'])) {
+                    fwrite($client, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    fclose($client);
+
+                    continue;
+                }
+
+                $this->respond($client, $query);
+                fclose($client);
+
+                return $query;
             }
 
-            $requestLine = fgets($client) ?: '';
-            $query = $this->parseQuery($requestLine);
-
-            $this->respond($client, $query);
-            fclose($client);
-
-            return $query;
+            throw new RuntimeException('Timed out waiting for the browser redirect.');
         } finally {
             fclose($server);
         }
     }
 
+    /**
+     * Always "localhost": it is what users register as the consumer callback
+     * (see README and `bb auth login`), and Bitbucket matches it exactly. The
+     * server itself still listens on the loopback IP only.
+     */
     public function redirectUri(): string
     {
-        return "http://{$this->host}:{$this->port}/callback";
+        return "http://localhost:{$this->port}/callback";
     }
 
     /**
@@ -62,7 +83,8 @@ class OAuthCallbackServer
     private function parseQuery(string $requestLine): array
     {
         // e.g. "GET /callback?code=abc&state=xyz HTTP/1.1"
-        if (! preg_match('#^GET\s+(\S+)\s+HTTP#', $requestLine, $matches)) {
+        if (! preg_match('#^GET\s+(\S+)\s+HTTP#', $requestLine, $matches)
+            || parse_url($matches[1], PHP_URL_PATH) !== '/callback') {
             return [];
         }
 

@@ -12,7 +12,9 @@ class PrCommentCommand extends BitbucketCommand
     protected $signature = 'pr:comment
         {id : Pull request id}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--body= : Comment body (raw markdown)}';
+        {--body= : Comment body (raw markdown)}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Add a comment to a pull request';
 
@@ -35,6 +37,10 @@ class PrCommentCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Commented on PR #{$id}.");

@@ -14,7 +14,10 @@ class RepoEditCommand extends BitbucketCommand
         {--project= : Move to a project (key)}
         {--main-branch= : Set the main branch}
         {--private : Make the repository private}
-        {--public : Make the repository public}';
+        {--public : Make the repository public}
+        {--y|yes : Skip the confirmation for --public}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Edit repository settings';
 
@@ -44,10 +47,22 @@ class RepoEditCommand extends BitbucketCommand
         if (filled($this->option('main-branch'))) {
             $changes['mainbranch'] = ['name' => $this->option('main-branch')];
         }
+        if ($this->option('private') && $this->option('public')) {
+            $this->error('Pass either --private or --public, not both.');
+
+            return self::FAILURE;
+        }
         if ($this->option('private')) {
             $changes['is_private'] = true;
         }
         if ($this->option('public')) {
+            // Exposure can't be undone by flipping it back: always confirm.
+            if (! $this->option('yes') && ! $this->confirm("Make {$workspace}/{$slug} public? Anyone will be able to read its code and history.", false)) {
+                $this->line('Aborted.');
+
+                return self::FAILURE;
+            }
+
             $changes['is_private'] = false;
         }
 
@@ -61,6 +76,10 @@ class RepoEditCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Updated {$workspace}/{$slug}.");

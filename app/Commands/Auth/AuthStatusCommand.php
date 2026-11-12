@@ -24,7 +24,9 @@ class AuthStatusCommand extends BitbucketCommand
         }
 
         $method = $store->get('method');
-        $this->line("Config file: <comment>{$store->path()}</comment>");
+        $this->line($store->usesEnvToken()
+            ? 'Credentials: <comment>BB_TOKEN environment variable</comment>'
+            : "Config file: <comment>{$store->path()}</comment>");
         $this->line('Auth method: <comment>'.$this->methodLabel($method).'</comment>');
 
         if ($method === 'oauth' && filled($expiresAt = $store->get('oauth.expires_at'))) {

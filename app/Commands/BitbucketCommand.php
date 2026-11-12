@@ -12,7 +12,11 @@ use Illuminate\Support\Carbon;
 use LaravelZero\Framework\Commands\Command;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
+use Symfony\Component\Console\Exception\RuntimeException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Terminal;
 use Symfony\Component\Process\Process;
 
@@ -23,6 +27,7 @@ use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 use function Termwind\parse;
 use function Termwind\render;
+use function Termwind\renderUsing;
 
 /**
  * Base command for everything that talks to the Bitbucket API. Provides the
@@ -47,6 +52,17 @@ abstract class BitbucketCommand extends Command
     {
         $headers = $headers instanceof Arrayable ? $headers->toArray() : $headers;
         $rows = $rows instanceof Arrayable ? $rows->toArray() : $rows;
+
+        // Piped / redirected: plain tab-separated rows (like gh), no ANSI,
+        // no box drawing and no truncation, so scripts and agents can parse it.
+        if (! $this->output->isDecorated()) {
+            foreach ([$headers, ...$rows] as $row) {
+                $cells = array_map(fn ($cell) => str_replace(["\t", "\n"], ' ', $this->stripFormatting((string) $cell)), (array) $row);
+                $this->output->writeln(implode("\t", $cells), OutputInterface::OUTPUT_RAW);
+            }
+
+            return;
+        }
 
         [$headers, $rows] = $this->fitTableToTerminal($headers, $rows);
 
@@ -140,7 +156,7 @@ abstract class BitbucketCommand extends Command
     {
         $text = (string) $text;
 
-        if (blank($url)) {
+        if (blank($url) || ! $this->output->isDecorated()) {
             return $text;
         }
 
@@ -367,7 +383,18 @@ abstract class BitbucketCommand extends Command
 
     protected function outputByType(string $message, string $type = 'info'): void
     {
-        render(sprintf('<div class="output %s">%s</div>', e($type), e($message)));
+        $html = sprintf('<div class="output %s">%s</div>', e($type), e($message));
+
+        // Errors and warnings belong on stderr so stdout stays parseable.
+        if (in_array($type, ['error', 'warning'], true) && ($err = $this->errorOutput()) !== null) {
+            renderUsing($err);
+            render($html);
+            renderUsing(null);
+
+            return;
+        }
+
+        render($html);
     }
 
     public function info($string, $verbosity = null): void
@@ -387,12 +414,47 @@ abstract class BitbucketCommand extends Command
 
     public function confirm($question, $default = false): bool
     {
+        // Never silently take the default when nobody can answer: a piped or
+        // agent-driven run must opt in explicitly.
+        if (! $this->canPrompt()) {
+            throw new RuntimeException("Confirmation required (\"{$question}\"). Re-run with --yes to proceed non-interactively.");
+        }
+
         return confirm(label: $question, default: $default);
     }
 
     public function ask($question, $default = null): mixed
     {
+        if (! $this->canPrompt()) {
+            throw new RuntimeException("Input required (\"{$question}\"). Re-run with --yes or pass the value as an option.");
+        }
+
         return text(label: $question, default: (string) $default);
+    }
+
+    /**
+     * Guard for actions people run all the time (no prompt for them) but that
+     * should not happen by accident from a script or agent: unattended runs
+     * must pass --yes.
+     */
+    protected function allowUnattended(string $action): bool
+    {
+        if ($this->canPrompt() || ($this->hasOption('yes') && $this->option('yes'))) {
+            return true;
+        }
+
+        $this->reportError("{$action} needs --yes when run non-interactively; nothing was sent.");
+
+        return false;
+    }
+
+    /**
+     * Whether a human can answer prompts (mirrors Laravel's ConfiguresPrompts).
+     */
+    protected function canPrompt(): bool
+    {
+        return $this->input->isInteractive()
+            && ((defined('STDIN') && stream_isatty(STDIN)) || $this->laravel->runningUnitTests());
     }
 
     public function secret($question, $fallback = true): mixed
@@ -431,13 +493,25 @@ abstract class BitbucketCommand extends Command
         }
 
         try {
-            $authenticator = (new BitbucketConnector($store))->refreshAccessToken((string) $refreshToken);
+            // Under the config lock, and re-checked after re-reading: when
+            // several bb processes start at once (agents run commands in
+            // parallel) only the first refreshes; the rest pick up its token
+            // instead of spending a refresh token that may already be rotated.
+            $store->locked(function (CredentialStore $store) {
+                $refreshToken = $store->get('oauth.refresh_token');
 
-            $store->fill([
-                'oauth.access_token' => $authenticator->getAccessToken(),
-                'oauth.refresh_token' => $authenticator->getRefreshToken() ?? $refreshToken,
-                'oauth.expires_at' => $authenticator->getExpiresAt()?->getTimestamp(),
-            ])->save();
+                if (blank($refreshToken) || time() < ((int) $store->get('oauth.expires_at') - 60)) {
+                    return;
+                }
+
+                $authenticator = (new BitbucketConnector($store))->refreshAccessToken((string) $refreshToken);
+
+                $store->fill([
+                    'oauth.access_token' => $authenticator->getAccessToken(),
+                    'oauth.refresh_token' => $authenticator->getRefreshToken() ?? $refreshToken,
+                    'oauth.expires_at' => $authenticator->getExpiresAt()?->getTimestamp(),
+                ])->save();
+            });
         } catch (\Throwable $e) {
             $this->warn('OAuth token refresh failed ('.$e->getMessage().'). Run "bb auth login" again if requests fail.');
         }
@@ -459,6 +533,10 @@ abstract class BitbucketCommand extends Command
 
     protected function notConfiguredMessage(): string
     {
+        if ($this->credentials()->isUnreadable()) {
+            return "Your bb config ({$this->credentials()->path()}) is not valid JSON. Fix or delete it, then run: bb configure";
+        }
+
         return $this->credentials()->usesAppPassword()
             ? 'Bitbucket no longer accepts app passwords. Create an API token and run: bb configure'
             : 'bb is not configured yet. Run: bb configure';
@@ -578,11 +656,45 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
+     * Validate --jq before handle() runs, so a missing jq binary or a typo in
+     * the filter fails the command before any request is sent; otherwise a
+     * merge or POST would happen and still exit 1, inviting a retry.
+     */
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $filter = $this->hasOption('jq') ? $this->option('jq') : null;
+
+        if (filled($filter)) {
+            $check = new Process(['jq', '-n', $filter]);
+
+            try {
+                $check->run();
+                $code = $check->getExitCode();
+            } catch (\Throwable) {
+                $code = 127;
+            }
+
+            // jq exits 2 on usage errors, 3 on compile errors; runtime errors
+            // on the null input used here (exit 5) are fine.
+            if (in_array($code, [2, 3, 127], true)) {
+                $this->reportError($code === 127
+                    ? '--jq needs the jq binary (https://jqlang.org); nothing was sent.'
+                    : 'Invalid --jq filter: '.trim($check->getErrorOutput()).' (nothing was sent)');
+
+                return self::FAILURE;
+            }
+        }
+
+        return parent::execute($input, $output);
+    }
+
+    /**
      * Whether the command was asked to emit machine-readable JSON.
      */
     protected function wantsJson(): bool
     {
-        return $this->hasOption('json') && (bool) $this->option('json');
+        return ($this->hasOption('json') && (bool) $this->option('json'))
+            || ($this->hasOption('jq') && filled($this->option('jq')));
     }
 
     /**
@@ -595,7 +707,7 @@ abstract class BitbucketCommand extends Command
         $filter = $this->hasOption('jq') ? $this->option('jq') : null;
 
         if (blank($filter)) {
-            $this->output->writeln($json);
+            $this->output->writeln($json, OutputInterface::OUTPUT_RAW);
 
             return self::SUCCESS;
         }
@@ -605,12 +717,12 @@ abstract class BitbucketCommand extends Command
         $process->run();
 
         if (! $process->isSuccessful()) {
-            $this->error(trim($process->getErrorOutput()) ?: 'jq failed (is it installed?)');
+            $this->reportError('jq failed on the response: '.(trim($process->getErrorOutput()) ?: 'unknown error'));
 
             return self::FAILURE;
         }
 
-        $this->output->write($process->getOutput());
+        $this->output->write($process->getOutput(), false, OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }
@@ -680,12 +792,16 @@ abstract class BitbucketCommand extends Command
      */
     protected function notify(string $title, string $message): void
     {
-        $title = str_replace('"', "'", $title);
-        $message = str_replace('"', "'", $message);
+        if (! $this->canPrompt()) {
+            return; // nobody is watching a desktop
+        }
+
+        // AppleScript string literal: escape backslashes first, then quotes.
+        $quote = fn (string $s) => '"'.str_replace(['\\', '"'], ['\\\\', '\\"'], $s).'"';
 
         try {
             $command = match (PHP_OS_FAMILY) {
-                'Darwin' => 'osascript -e '.escapeshellarg("display notification \"{$message}\" with title \"{$title}\""),
+                'Darwin' => 'osascript -e '.escapeshellarg('display notification '.$quote($message).' with title '.$quote($title)),
                 'Linux' => 'notify-send '.escapeshellarg($title).' '.escapeshellarg($message),
                 default => null,
             };
@@ -705,7 +821,8 @@ abstract class BitbucketCommand extends Command
     {
         $opener = match (PHP_OS_FAMILY) {
             'Darwin' => 'open',
-            'Windows' => 'start',
+            // start treats the first quoted argument as a window title.
+            'Windows' => 'start ""',
             default => 'xdg-open',
         };
 
@@ -763,7 +880,7 @@ abstract class BitbucketCommand extends Command
         try {
             $response = $this->dispatch($this->connector(), $request);
         } catch (\Throwable $e) {
-            $this->error('Request failed: '.$e->getMessage());
+            $this->reportError('Request failed: '.$e->getMessage());
 
             return null;
         }
@@ -823,6 +940,10 @@ abstract class BitbucketCommand extends Command
                 $values = array_merge($values, $data['values'] ?? []);
 
                 if ($limit !== null && count($values) >= $limit) {
+                    if (count($values) > $limit || filled($data['next'] ?? null)) {
+                        $this->stderr("Showing the first {$limit} results; more exist (raise --limit to see them).");
+                    }
+
                     return array_slice($values, 0, $limit);
                 }
 
@@ -832,10 +953,17 @@ abstract class BitbucketCommand extends Command
                     return $values;
                 }
 
+                // The bearer token goes with this request: only follow links
+                // back to the API host we started on.
+                if (parse_url($next, PHP_URL_SCHEME) !== 'https'
+                    || parse_url($next, PHP_URL_HOST) !== parse_url($connector->resolveBaseUrl(), PHP_URL_HOST)) {
+                    throw new \RuntimeException("Refusing to follow a pagination link to another host: {$next}");
+                }
+
                 $response = $this->dispatch($connector, new NextPageRequest($next));
             }
         } catch (\Throwable $e) {
-            $this->error('Request failed: '.$e->getMessage());
+            $this->reportError('Request failed: '.$e->getMessage());
 
             return null;
         }
@@ -878,9 +1006,16 @@ abstract class BitbucketCommand extends Command
             ? data_get($body, 'error.message', $response->body())
             : ($response->body() ?: 'Unknown error');
 
-        $this->error("Bitbucket API [{$response->status()}]: {$message}");
-
         $status = $response->status();
+
+        if ($this->wantsJson()) {
+            $this->stderr(json_encode(['error' => ['status' => $status, 'message' => $message]], JSON_UNESCAPED_SLASHES));
+
+            return;
+        }
+
+        $this->error("Bitbucket API [{$status}]: {$message}");
+
         $url = $response->getPendingRequest()->getUrl();
 
         if ($status === 401) {
@@ -890,5 +1025,38 @@ abstract class BitbucketCommand extends Command
         if (in_array($status, [404, 410], true) && str_contains($url, '/issues')) {
             $this->warn('This repository does not have the issue tracker enabled (turn it on in Repository settings → Issue tracker).');
         }
+    }
+
+    /**
+     * Report a failure: a JSON error object on stderr in --json mode,
+     * otherwise the usual styled error line.
+     */
+    protected function reportError(string $message): void
+    {
+        if ($this->wantsJson()) {
+            $this->stderr(json_encode(['error' => ['message' => $message]], JSON_UNESCAPED_SLASHES));
+
+            return;
+        }
+
+        $this->error($message);
+    }
+
+    /**
+     * Write a raw line to stderr (stdout when there is no separate stream).
+     */
+    protected function stderr(string $line): void
+    {
+        ($this->errorOutput() ?? $this->output)->writeln($line, OutputInterface::OUTPUT_RAW);
+    }
+
+    /**
+     * The real stderr stream, or null when output is a single buffer (tests).
+     */
+    protected function errorOutput(): ?OutputInterface
+    {
+        $inner = method_exists($this->output, 'getOutput') ? $this->output->getOutput() : $this->output;
+
+        return $inner instanceof ConsoleOutputInterface ? $inner->getErrorOutput() : null;
     }
 }

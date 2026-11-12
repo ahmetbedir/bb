@@ -11,7 +11,9 @@ class PrStatusCommand extends BitbucketCommand
 {
     protected $signature = 'pr:status
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--limit=100 : Maximum number of open PRs to scan}';
+        {--limit=100 : Maximum number of open PRs to scan}
+        {--json : Output as JSON ({"authored": [...], "reviewing": [...]})}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Show open pull requests relevant to you in a repository';
 
@@ -60,6 +62,10 @@ class PrStatusCommand extends BitbucketCommand
             if ($isReviewer) {
                 $reviewing[] = $pr;
             }
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson(['authored' => $authored, 'reviewing' => $reviewing]);
         }
 
         $this->section('Created by you', $authored);

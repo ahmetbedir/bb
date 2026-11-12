@@ -18,6 +18,7 @@ class ConfigCommand extends BitbucketCommand
         'pager' => 'auto|off — page long output through $PAGER/less',
         'default_destination' => 'default destination branch pre-selected in pr:create',
         'destinations' => 'destination branches offered in pr:create (comma/space separated)',
+        'skill_auto_update' => 'on|off - refresh the global agent skill after bb upgrades',
     ];
 
     public function handle(): int

@@ -24,7 +24,8 @@ class AuthSetupGitCommand extends BitbucketCommand
         $this->gitQuiet(['config', '--global', '--unset-all', $key]);
 
         $ok = $this->gitQuiet(['config', '--global', '--add', $key, ''])
-            && $this->gitQuiet(['config', '--global', '--add', $key, "!'{$binary}' auth git-credential"]);
+            // git runs "!..." helpers through the shell; quote the path safely.
+            && $this->gitQuiet(['config', '--global', '--add', $key, '!'.escapeshellarg($binary).' auth git-credential']);
 
         if (! $ok) {
             $this->error('Failed to update your git configuration.');

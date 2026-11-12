@@ -12,7 +12,9 @@ class TagCreateCommand extends BitbucketCommand
     protected $signature = 'tag:create
         {name? : Tag name}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--target= : Commit hash to tag}';
+        {--target= : Commit hash to tag}
+        {--json : Output the API response as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Create a tag';
 
@@ -38,6 +40,11 @@ class TagCreateCommand extends BitbucketCommand
         }
 
         $tag = $response->json();
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
+        }
+
         $this->info("Created tag \"{$tag['name']}\" at ".substr($tag['target']['hash'] ?? $target, 0, 8));
 
         return self::SUCCESS;

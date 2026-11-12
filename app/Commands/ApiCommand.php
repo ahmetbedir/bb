@@ -4,6 +4,8 @@ namespace App\Commands;
 
 use App\Http\Integrations\Bitbucket\Requests\ApiRequest;
 use App\Http\Integrations\Bitbucket\Requests\ApiRequestWithBody;
+use Saloon\Enums\Method;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class ApiCommand extends BitbucketCommand
 {
@@ -13,7 +15,9 @@ class ApiCommand extends BitbucketCommand
         {--f|field=* : Body field as key=value (repeatable), added to a JSON body}
         {--query=* : Query parameter as key=value (repeatable)}
         {--input= : Raw JSON request body ("-" reads stdin)}
-        {--jq= : Filter the JSON response through a jq expression}';
+        {--paginate : Follow "next" links and return every "values" entry as one JSON array (GET only)}
+        {--jq= : Filter the JSON response through a jq expression}
+        {--y|yes : Confirm the action when running non-interactively (scripts, agents)}';
 
     protected $description = 'Make an authenticated request to the Bitbucket API';
 
@@ -29,7 +33,24 @@ class ApiCommand extends BitbucketCommand
             return self::FAILURE;
         }
 
-        $method = (string) $this->option('method');
+        $method = strtoupper((string) $this->option('method'));
+
+        if (Method::tryFrom($method) === null) {
+            $this->error("Unsupported HTTP method \"{$method}\".");
+
+            return self::FAILURE;
+        }
+
+        if ($method !== 'GET' && ! $this->allowUnattended("A {$method} request")) {
+            return self::FAILURE;
+        }
+
+        if ($this->option('paginate') && ($method !== 'GET' || $body !== [])) {
+            $this->error('--paginate only works with GET requests without a body.');
+
+            return self::FAILURE;
+        }
+
         $endpoint = $this->normalizePath($this->argument('path'));
         $query = $this->parsePairs($this->option('query'));
 
@@ -38,6 +59,12 @@ class ApiCommand extends BitbucketCommand
         $request = $body === []
             ? new ApiRequest($method, $endpoint, $query)
             : new ApiRequestWithBody($method, $endpoint, $query, $body);
+
+        if ($this->option('paginate')) {
+            $values = $this->collectAll($request);
+
+            return $values === null ? self::FAILURE : $this->outputJson($values);
+        }
 
         $response = $this->send($request);
 
@@ -52,7 +79,7 @@ class ApiCommand extends BitbucketCommand
         }
 
         // Non-JSON payload (e.g. a diff) — print it verbatim.
-        $this->output->write($response->body());
+        $this->output->write($response->body(), false, OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

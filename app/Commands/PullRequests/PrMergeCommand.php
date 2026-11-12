@@ -12,7 +12,10 @@ class PrMergeCommand extends BitbucketCommand
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
         {--strategy=merge_commit : merge_commit, squash or fast_forward}
         {--message= : Custom merge commit message}
-        {--close-source-branch : Close the source branch after merge}';
+        {--close-source-branch : Close the source branch after merge}
+        {--y|yes : Skip the confirmation prompt}
+        {--json : Output the merged pull request as JSON}
+        {--jq= : Filter the JSON output through a jq expression}';
 
     protected $description = 'Merge a pull request';
 
@@ -29,7 +32,7 @@ class PrMergeCommand extends BitbucketCommand
         [$workspace, $slug] = $resolved;
         $id = $this->argument('id');
 
-        if (! $this->confirm("Merge PR #{$id} in {$workspace}/{$slug}?", true)) {
+        if (! $this->option('yes') && ! $this->confirm("Merge PR #{$id} in {$workspace}/{$slug}?", true)) {
             $this->line('Aborted.');
 
             return self::SUCCESS;
@@ -46,6 +49,10 @@ class PrMergeCommand extends BitbucketCommand
 
         if ($response === null) {
             return self::FAILURE;
+        }
+
+        if ($this->wantsJson()) {
+            return $this->outputJson($response->json());
         }
 
         $this->info("Merged PR #{$id}.");

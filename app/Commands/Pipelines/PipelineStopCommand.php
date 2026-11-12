@@ -13,7 +13,8 @@ class PipelineStopCommand extends BitbucketCommand
     protected $signature = 'pipeline:stop
         {pipeline? : Build number or UUID (defaults to the most recent pipeline)}
         {--R|repo= : Target repository as "workspace/repo" (defaults to the current git repo)}
-        {--branch= : When no pipeline is given, stop the latest one on this branch}';
+        {--branch= : When no pipeline is given, stop the latest one on this branch}
+        {--y|yes : Confirm the action when running non-interactively (scripts, agents)}';
 
     protected $description = 'Stop a running pipeline';
 
@@ -32,6 +33,10 @@ class PipelineStopCommand extends BitbucketCommand
         $ref = $this->resolvePipelineRef($workspace, $slug, $this->argument('pipeline'));
 
         if ($ref === null) {
+            return self::FAILURE;
+        }
+
+        if (! $this->allowUnattended('Stopping a pipeline')) {
             return self::FAILURE;
         }
 
