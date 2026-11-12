@@ -18,6 +18,7 @@ composer format    # vendor/bin/pint
 ./bb list          # every command; ./bb list --format=json for machine output
 scripts/build-phar.sh bb v1.2.3   # release PHAR without dev deps (never call app:build directly)
 scripts/build-notifier.sh         # macOS only: build "bb Notifier.app" (build-phar.sh runs it)
+scripts/release.sh v1.2.3         # publish; notes from notes/v1.2.3.md, else generated from commits
 ```
 
 Run `composer test` before finishing any change. Laravel PAO (dev dependency)

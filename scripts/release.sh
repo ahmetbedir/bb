@@ -7,6 +7,10 @@
 #
 #   scripts/release.sh v1.0.2
 #
+# Release notes come from notes/<version>.md when it exists; otherwise they
+# are generated from the commit subjects since the previous tag, grouped by
+# Conventional Commit type.
+#
 # Requires: php, ./vendor/bin/phpacker, gh (authenticated: `gh auth login`),
 # run inside the repo with its GitHub remote configured.
 
@@ -69,11 +73,40 @@ pack builds/build/windows/windows-x64.exe bb-windows-x86_64
 sed "s|@@REPO@@|$REPO|g" install.sh  > "$dist/install.sh"
 sed "s|@@REPO@@|$REPO|g" install.ps1 > "$dist/install.ps1"
 
+echo "==> Preparing release notes"
+notes="$dist/notes.md"
+if [ -f "notes/$VERSION.md" ]; then
+    cp "notes/$VERSION.md" "$notes"
+    echo "    using notes/$VERSION.md"
+else
+    prev="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+    range="${prev:+$prev..}HEAD"
+    subjects="$(git log --no-merges --format='%s (%h)' "$range")"
+
+    section() { # section <title> <regex on the commit type>
+        lines="$(printf '%s\n' "$subjects" | grep -E "$2" | sed 's/^/- /' || true)"
+        [ -n "$lines" ] && printf '## %s\n\n%s\n\n' "$1" "$lines"
+        return 0
+    }
+
+    {
+        [ -z "$subjects" ] && printf 'Maintenance release.\n\n'
+        section "Features" '^feat(\(|!|:)'
+        section "Fixes" '^fix(\(|!|:)'
+        section "Other changes" '^(build|chore|ci|docs|perf|refactor|revert|style|test)(\(|!|:)'
+        printf '%s\n' "$subjects" | grep -qE '^[a-z]+(\([^)]*\))?!:' \
+            && printf '## ⚠️ Breaking changes\n\nSee the entries marked with "!" above.\n\n'
+        [ -n "$prev" ] && printf '**Full changelog:** https://github.com/%s/compare/%s...%s\n' "$REPO" "$prev" "$VERSION"
+        true
+    } > "$notes"
+    echo "    generated from ${range} (add notes/$VERSION.md to write them by hand)"
+fi
+
 echo "==> Publishing GitHub release"
 # As a draft first, so nobody sees a "latest" release with missing assets
 # while they upload; then upload in parallel (one connection doesn't fill the
 # uplink) and publish once all are there.
-gh release create "$VERSION" --draft --title "$VERSION" --notes "bb $VERSION"
+gh release create "$VERSION" --draft --title "$VERSION" --notes-file "$notes"
 
 pids=""
 for asset in "$dist"/bb-* "$dist/install.sh" "$dist/install.ps1"; do
