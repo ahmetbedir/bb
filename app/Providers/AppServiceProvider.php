@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\CredentialStore;
+use App\Support\MacNotifier;
 use App\Support\SkillUpdater;
 use Illuminate\Console\Application as Artisan;
 use Illuminate\Console\Events\CommandStarting;
@@ -90,5 +91,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->register(SaloonServiceProvider::class);
 
         $this->app->singleton(CredentialStore::class, fn () => new CredentialStore);
+        $this->app->singleton(MacNotifier::class, fn () => MacNotifier::default());
     }
 }

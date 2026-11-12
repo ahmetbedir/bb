@@ -7,6 +7,7 @@ use App\Http\Integrations\Bitbucket\Requests\NextPageRequest;
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequests;
 use App\Support\CredentialStore;
 use App\Support\GitContext;
+use App\Support\MacNotifier;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Process as IlluminateProcess;
@@ -802,7 +803,13 @@ abstract class BitbucketCommand extends Command
         }
 
         try {
-            // JoliNotif copies the icon out of the PHAR when bb runs as one.
+            // macOS: our own app, so the notification shows "bb" and its icon.
+            if ($this->laravel->make(MacNotifier::class)->send($title, $message)) {
+                return;
+            }
+
+            // Elsewhere (or if that fails): JoliNotif. It copies the icon out
+            // of the PHAR when bb runs as one.
             $notification = $this->laravel->make(Notification::class)
                 ->setTitle($title)
                 ->setBody($message)

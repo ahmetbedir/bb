@@ -6,3 +6,5 @@
 /.vscode
 /.vagrant
 .phpunit.result.cache
+/resources/notifier/*
+!/resources/notifier/.gitkeep

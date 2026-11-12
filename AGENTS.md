@@ -17,6 +17,7 @@ composer lint      # vendor/bin/pint --test
 composer format    # vendor/bin/pint
 ./bb list          # every command; ./bb list --format=json for machine output
 scripts/build-phar.sh bb v1.2.3   # release PHAR without dev deps (never call app:build directly)
+scripts/build-notifier.sh         # macOS only: build "bb Notifier.app" (build-phar.sh runs it)
 ```
 
 Run `composer test` before finishing any change. Laravel PAO (dev dependency)
@@ -37,6 +38,10 @@ is no need to grep or tail the test output.
 - `app/Http/Integrations/Bitbucket/Requests/<Area>/`: one Saloon request per
   endpoint. `ApiRequest` (no body) vs `ApiRequestWithBody`; `NextPageRequest`
   follows `next` links.
+- `macos/notifier/` + `app/Support/MacNotifier.php`: native macOS
+  notifications as "bb" (Swift app bundled in the PHAR, installed to
+  `~/Library/Application Support/bb` on first use). It must stay outside temp
+  dirs and run as an AppKit app, or macOS refuses it without asking.
 - `app/Support/CredentialStore.php`: config file (`~/.config/bb/config.json`,
   `BB_HOME` overrides) plus `BB_TOKEN` / `BB_WORKSPACE` env overrides that are
   never written to disk.

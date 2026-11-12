@@ -20,5 +20,13 @@ cd "$(dirname "$0")/.."
 restore() { composer install --no-interaction --quiet; }
 trap restore EXIT
 
+# The native macOS notifier can only be built on macOS; elsewhere bb falls
+# back to JoliNotif for notifications.
+if [ "$(uname)" = Darwin ]; then
+    scripts/build-notifier.sh >/dev/null
+else
+    echo "warning: not on macOS, building without bb Notifier.app" >&2
+fi
+
 composer install --no-dev --no-interaction --quiet
 php bb app:build "$NAME" --build-version="$VERSION" --no-interaction >/dev/null

@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Support\MacNotifier;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use LaravelZero\Framework\Testing\TestCase as BaseTestCase;
@@ -18,7 +19,13 @@ abstract class TestCase extends BaseTestCase
         $app = require Application::inferBasePath().'/bootstrap/app.php';
 
         // Runs after environment detection, before service providers boot.
-        $app->booting(fn (Application $app) => $app->instance('env', 'testing'));
+        $app->booting(function (Application $app) {
+            $app->instance('env', 'testing');
+
+            // Never install the real macOS notifier app or post real
+            // notifications from tests; MacNotifierTest covers it with temp dirs.
+            $app->instance(MacNotifier::class, new MacNotifier('/nonexistent', sys_get_temp_dir()));
+        });
 
         $app->make(Kernel::class)->bootstrap();
 
