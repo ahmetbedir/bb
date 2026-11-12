@@ -3,6 +3,7 @@
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\CreatePullRequestComment;
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequestStatuses;
 use App\Support\CredentialStore;
+use Illuminate\Support\Facades\Process;
 use Joli\JoliNotif\Notification;
 use NunoMaduro\LaravelDesktopNotifier\Contracts\Notifier;
 use Saloon\Http\Faking\MockClient;
@@ -80,3 +81,36 @@ it('sends a desktop notification through the Laravel Zero notifier when watched 
 
     runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api', '--watch' => true, '--no-interaction' => true]);
 });
+
+it('falls back to opening terminal-notifier through LaunchServices when macOS refuses it', function () {
+    MockClient::global([
+        ListPullRequestStatuses::class => MockResponse::make(['values' => [['state' => 'SUCCESSFUL', 'name' => 'Unit']]], 200),
+    ]);
+
+    // A Homebrew-style wrapper that execs the binary inside an .app bundle.
+    $tmp = sys_get_temp_dir().'/bb-tn-'.uniqid();
+    $app = "{$tmp}/Cellar/terminal-notifier.app";
+    mkdir("{$app}/Contents/MacOS", 0755, true);
+    mkdir("{$tmp}/bin");
+    file_put_contents("{$tmp}/bin/terminal-notifier", "#!/bin/bash\nexec \"{$app}/Contents/MacOS/terminal-notifier\" \"\$@\"\n");
+    chmod("{$tmp}/bin/terminal-notifier", 0755);
+
+    $notifier = Mockery::mock(Notifier::class);
+    $notifier->shouldReceive('send')->once()->andReturn(false); // what JoliNotif returns when macOS says no
+    $this->app->instance(Notifier::class, $notifier);
+    Process::fake();
+
+    $path = getenv('PATH');
+    putenv("PATH={$tmp}/bin");
+
+    try {
+        runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api', '--watch' => true]);
+    } finally {
+        putenv("PATH={$path}");
+    }
+
+    Process::assertRan(fn ($process) => $process->command === [
+        'open', '-g', '-a', $app, '--args', '-title', 'PR #5 checks', '-message', 'All checks passed',
+        '-contentImage', realpath(base_path('assets/icon.png')),
+    ]);
+})->skip(PHP_OS_FAMILY !== 'Darwin', 'macOS only');

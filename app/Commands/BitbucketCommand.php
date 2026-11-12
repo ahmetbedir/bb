@@ -9,6 +9,7 @@ use App\Support\CredentialStore;
 use App\Support\GitContext;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Process as IlluminateProcess;
 use LaravelZero\Framework\Commands\Command;
 use NunoMaduro\LaravelDesktopNotifier\Contracts\Notification;
 use NunoMaduro\LaravelDesktopNotifier\Contracts\Notifier;
@@ -20,6 +21,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Terminal;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
@@ -801,15 +803,58 @@ abstract class BitbucketCommand extends Command
 
         try {
             // JoliNotif copies the icon out of the PHAR when bb runs as one.
-            $this->laravel->make(Notifier::class)->send(
-                $this->laravel->make(Notification::class)
-                    ->setTitle($title)
-                    ->setBody($message)
-                    ->setIcon(base_path('assets/icon.png'))
-            );
+            $notification = $this->laravel->make(Notification::class)
+                ->setTitle($title)
+                ->setBody($message)
+                ->setIcon(base_path('assets/icon.png'));
+
+            if (! $this->laravel->make(Notifier::class)->send($notification)) {
+                $this->notifyThroughLaunchServices($title, $message, $notification->getIcon());
+            }
         } catch (\Throwable) {
             // Notifications are best-effort.
         }
+    }
+
+    /**
+     * macOS fallback when JoliNotif's send fails. It prefers terminal-notifier
+     * whenever it is installed, but Homebrew's terminal-notifier is ad-hoc
+     * signed and run as a bare binary, so on first use macOS refuses it
+     * without ever asking the user, and JoliNotif does not fall back. Opening
+     * the app through LaunchServices registers it, triggers the permission
+     * prompt and delivers this notification.
+     */
+    private function notifyThroughLaunchServices(string $title, string $message, ?string $icon): void
+    {
+        if (PHP_OS_FAMILY !== 'Darwin' || ($app = $this->terminalNotifierApp()) === null) {
+            return;
+        }
+
+        $args = ['open', '-g', '-a', $app, '--args', '-title', $title, '-message', $message];
+
+        if (filled($icon)) {
+            array_push($args, '-contentImage', $icon);
+        }
+
+        IlluminateProcess::run($args);
+    }
+
+    /**
+     * The terminal-notifier .app bundle behind the `terminal-notifier` command
+     * (Homebrew installs a wrapper script that execs the binary inside it).
+     */
+    private function terminalNotifierApp(): ?string
+    {
+        $command = (new ExecutableFinder)->find('terminal-notifier');
+
+        if ($command === null) {
+            return null;
+        }
+
+        $target = realpath($command) ?: $command;
+        $haystack = str_contains($target, '.app/') ? $target : (string) @file_get_contents($target, length: 4096);
+
+        return preg_match('#(/[^"\'\n]+?\.app)/Contents/MacOS/#', $haystack, $m) && is_dir($m[1]) ? $m[1] : null;
     }
 
     /**
