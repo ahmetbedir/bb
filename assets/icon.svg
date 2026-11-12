@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- bb app icon: an original "bb" monogram built from shapes (no fonts),
+       on the navy used by bb's OAuth callback page. Source for assets/icon.png. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1424"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <!-- userSpaceOnUse: the stems are zero-width boxes, where a bounding-box gradient paints nothing -->
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="88" y1="104" x2="424" y2="408">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="17.5" y="17.5" width="477" height="477" rx="110.5" fill="none" stroke="#24334d" stroke-width="3"/>
+
+  <g fill="none" stroke="url(#ink)" stroke-width="40" stroke-linecap="round">
+    <!-- first b: stem + bowl -->
+    <path d="M108 124 V330"/>
+    <circle cx="166" cy="330" r="58"/>
+    <!-- second b -->
+    <path d="M288 124 V330"/>
+    <circle cx="346" cy="330" r="58"/>
+  </g>
+</svg>

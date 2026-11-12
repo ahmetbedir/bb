@@ -800,8 +800,12 @@ abstract class BitbucketCommand extends Command
         }
 
         try {
+            // JoliNotif copies the icon out of the PHAR when bb runs as one.
             $this->laravel->make(Notifier::class)->send(
-                $this->laravel->make(Notification::class)->setTitle($title)->setBody($message)
+                $this->laravel->make(Notification::class)
+                    ->setTitle($title)
+                    ->setBody($message)
+                    ->setIcon(base_path('assets/icon.png'))
             );
         } catch (\Throwable) {
             // Notifications are best-effort.

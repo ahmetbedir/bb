@@ -65,7 +65,9 @@ it('sends a desktop notification through the Laravel Zero notifier when watched 
 
     $notifier = Mockery::mock(Notifier::class);
     $notifier->shouldReceive('send')->once()
-        ->withArgs(fn (Notification $n) => $n->getTitle() === 'PR #5 checks' && $n->getBody() === 'A check failed')
+        ->withArgs(fn (Notification $n) => $n->getTitle() === 'PR #5 checks'
+            && $n->getBody() === 'A check failed'
+            && $n->getIcon() === realpath(base_path('assets/icon.png')))
         ->andReturn(true);
     $this->app->instance(Notifier::class, $notifier);
 
