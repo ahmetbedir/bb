@@ -3,6 +3,8 @@
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\CreatePullRequestComment;
 use App\Http\Integrations\Bitbucket\Requests\PullRequests\ListPullRequestStatuses;
 use App\Support\CredentialStore;
+use Joli\JoliNotif\Notification;
+use NunoMaduro\LaravelDesktopNotifier\Contracts\Notifier;
 use Saloon\Http\Faking\MockClient;
 use Saloon\Http\Faking\MockResponse;
 
@@ -54,4 +56,25 @@ it('posts a pull request comment', function () {
     $this->artisan('pr:comment 5 --repo=acme/api --body=LGTM')
         ->expectsOutputToContain('Commented on PR #5')
         ->assertSuccessful();
+});
+
+it('sends a desktop notification through the Laravel Zero notifier when watched checks finish', function () {
+    MockClient::global([
+        ListPullRequestStatuses::class => MockResponse::make(['values' => [['state' => 'FAILED', 'name' => 'Lint']]], 200),
+    ]);
+
+    $notifier = Mockery::mock(Notifier::class);
+    $notifier->shouldReceive('send')->once()
+        ->withArgs(fn (Notification $n) => $n->getTitle() === 'PR #5 checks' && $n->getBody() === 'A check failed')
+        ->andReturn(true);
+    $this->app->instance(Notifier::class, $notifier);
+
+    runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api', '--watch' => true]);
+
+    // Nobody to notify when the run is unattended.
+    $silent = Mockery::mock(Notifier::class);
+    $silent->shouldNotReceive('send');
+    $this->app->instance(Notifier::class, $silent);
+
+    runCommand('pr:checks', ['id' => 5, '--repo' => 'acme/api', '--watch' => true, '--no-interaction' => true]);
 });

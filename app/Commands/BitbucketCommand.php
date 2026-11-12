@@ -10,6 +10,8 @@ use App\Support\GitContext;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Carbon;
 use LaravelZero\Framework\Commands\Command;
+use NunoMaduro\LaravelDesktopNotifier\Contracts\Notification;
+use NunoMaduro\LaravelDesktopNotifier\Contracts\Notifier;
 use Saloon\Http\Request;
 use Saloon\Http\Response;
 use Symfony\Component\Console\Exception\RuntimeException;
@@ -787,28 +789,20 @@ abstract class BitbucketCommand extends Command
     }
 
     /**
-     * Fire a desktop notification (best effort; silently ignored if the
-     * platform tool is unavailable).
+     * Fire a desktop notification through Laravel Zero's notifier (JoliNotif:
+     * macOS, Linux, Windows and WSL). Best effort, and skipped when no human
+     * is watching.
      */
     protected function notify(string $title, string $message): void
     {
         if (! $this->canPrompt()) {
-            return; // nobody is watching a desktop
+            return;
         }
 
-        // AppleScript string literal: escape backslashes first, then quotes.
-        $quote = fn (string $s) => '"'.str_replace(['\\', '"'], ['\\\\', '\\"'], $s).'"';
-
         try {
-            $command = match (PHP_OS_FAMILY) {
-                'Darwin' => 'osascript -e '.escapeshellarg('display notification '.$quote($message).' with title '.$quote($title)),
-                'Linux' => 'notify-send '.escapeshellarg($title).' '.escapeshellarg($message),
-                default => null,
-            };
-
-            if ($command !== null) {
-                Process::fromShellCommandline($command)->run();
-            }
+            $this->laravel->make(Notifier::class)->send(
+                $this->laravel->make(Notification::class)->setTitle($title)->setBody($message)
+            );
         } catch (\Throwable) {
             // Notifications are best-effort.
         }
