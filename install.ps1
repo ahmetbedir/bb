@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 $repo  = '@@REPO@@'
-$asset = 'bb-windows-x86_64.exe'
+$asset = 'bb-windows-x86_64.zip'
 $url   = "https://github.com/$repo/releases/latest/download/$asset"
 
 $dir = Join-Path $env:LOCALAPPDATA 'bb'
@@ -14,7 +14,14 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $target = Join-Path $dir 'bb.exe'
 
 Write-Host "==> Downloading $asset"
-Invoke-WebRequest -Uri $url -OutFile $target
+$zip = Join-Path ([IO.Path]::GetTempPath()) "bb-$([guid]::NewGuid()).zip"
+try {
+    Invoke-WebRequest -Uri $url -OutFile $zip
+    # The archive holds a single bb.exe.
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+} finally {
+    Remove-Item $zip -ErrorAction SilentlyContinue
+}
 
 # Add the install directory to the user PATH if it isn't there already.
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')

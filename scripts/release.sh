@@ -36,29 +36,62 @@ echo "==> Cross-building all platforms with phpacker"
 ./vendor/bin/phpacker build all --no-interaction >/dev/null
 
 echo "==> Packaging release assets"
+# Each binary ships compressed (34 MB -> ~15 MB), holding a single "bb" (or
+# "bb.exe"): half the upload and half of every user's download. Homebrew
+# unpacks archives itself; install.sh/install.ps1 unpack them too.
 dist="builds/dist"
 rm -rf "$dist"; mkdir -p "$dist"
-cp builds/build/mac/mac-arm             "$dist/bb-macos-arm64"
-cp builds/build/mac/mac-x64             "$dist/bb-macos-x86_64"
-cp builds/build/linux/linux-arm         "$dist/bb-linux-arm64"
-cp builds/build/linux/linux-x64         "$dist/bb-linux-x86_64"
-cp builds/build/windows/windows-x64.exe "$dist/bb-windows-x86_64.exe"
-chmod +x "$dist"/bb-* 2>/dev/null || true
 
-# Ad-hoc sign the macOS binaries (required to run on Apple Silicon).
-codesign --force --sign - "$dist/bb-macos-arm64"  2>/dev/null || true
-codesign --force --sign - "$dist/bb-macos-x86_64" 2>/dev/null || true
+pack() { # pack <phpacker output> <asset name>
+    stage="$(mktemp -d)"
+    case "$2" in
+        *windows*)
+            cp "$1" "$stage/bb.exe"
+            (cd "$stage" && zip -q -9 "bb.zip" bb.exe)
+            mv "$stage/bb.zip" "$dist/$2.zip" ;;
+        *)
+            cp "$1" "$stage/bb"
+            chmod +x "$stage/bb"
+            # Ad-hoc sign macOS binaries (required to run on Apple Silicon).
+            case "$2" in *macos*) codesign --force --sign - "$stage/bb" 2>/dev/null || true ;; esac
+            tar -C "$stage" -czf "$dist/$2.tar.gz" bb ;;
+    esac
+    rm -rf "$stage"
+}
+
+pack builds/build/mac/mac-arm             bb-macos-arm64
+pack builds/build/mac/mac-x64             bb-macos-x86_64
+pack builds/build/linux/linux-arm         bb-linux-arm64
+pack builds/build/linux/linux-x64         bb-linux-x86_64
+pack builds/build/windows/windows-x64.exe bb-windows-x86_64
 
 # Bake the real repo slug into the installers so a plain curl of them works.
 sed "s|@@REPO@@|$REPO|g" install.sh  > "$dist/install.sh"
 sed "s|@@REPO@@|$REPO|g" install.ps1 > "$dist/install.ps1"
 
 echo "==> Publishing GitHub release"
-gh release create "$VERSION" \
-    "$dist"/bb-* "$dist/install.sh" "$dist/install.ps1" \
-    --title "$VERSION" \
-    --notes "bb $VERSION" \
-    --latest
+# As a draft first, so nobody sees a "latest" release with missing assets
+# while they upload; then upload in parallel (one connection doesn't fill the
+# uplink) and publish once all are there.
+gh release create "$VERSION" --draft --title "$VERSION" --notes "bb $VERSION"
+
+pids=""
+for asset in "$dist"/bb-* "$dist/install.sh" "$dist/install.ps1"; do
+    gh release upload "$VERSION" "$asset" --clobber &
+    pids="$pids $!"
+done
+
+failed=0
+for pid in $pids; do
+    wait "$pid" || failed=1
+done
+
+if [ "$failed" -ne 0 ]; then
+    echo "!! Upload failed; release $VERSION left as a draft. Fix and re-run the upload, or delete it with: gh release delete $VERSION" >&2
+    exit 1
+fi
+
+gh release edit "$VERSION" --draft=false --latest
 
 # --- Homebrew tap ------------------------------------------------------------
 OWNER="${REPO%/*}"
@@ -79,28 +112,28 @@ class Bb < Formula
 
   on_macos do
     on_arm do
-      url "$base/bb-macos-arm64"
-      sha256 "$(sha "$dist/bb-macos-arm64")"
+      url "$base/bb-macos-arm64.tar.gz"
+      sha256 "$(sha "$dist/bb-macos-arm64.tar.gz")"
     end
     on_intel do
-      url "$base/bb-macos-x86_64"
-      sha256 "$(sha "$dist/bb-macos-x86_64")"
+      url "$base/bb-macos-x86_64.tar.gz"
+      sha256 "$(sha "$dist/bb-macos-x86_64.tar.gz")"
     end
   end
 
   on_linux do
     on_arm do
-      url "$base/bb-linux-arm64"
-      sha256 "$(sha "$dist/bb-linux-arm64")"
+      url "$base/bb-linux-arm64.tar.gz"
+      sha256 "$(sha "$dist/bb-linux-arm64.tar.gz")"
     end
     on_intel do
-      url "$base/bb-linux-x86_64"
-      sha256 "$(sha "$dist/bb-linux-x86_64")"
+      url "$base/bb-linux-x86_64.tar.gz"
+      sha256 "$(sha "$dist/bb-linux-x86_64.tar.gz")"
     end
   end
 
   def install
-    bin.install Dir["bb-*"].first => "bb"
+    bin.install "bb"
   end
 
   test do

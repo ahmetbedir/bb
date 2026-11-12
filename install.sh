@@ -27,24 +27,25 @@ case "$arch" in
     *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
-asset="bb-${os}-${arch}"
+asset="bb-${os}-${arch}.tar.gz"
 url="https://github.com/${REPO}/releases/latest/download/${asset}"
 
 dir="${BB_INSTALL_DIR:-/usr/local/bin}"
 [ -d "$dir" ] || dir="$HOME/.local/bin"
 mkdir -p "$dir"
 
-tmp="$(mktemp)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
 echo "==> Downloading ${asset}"
-curl -fsSL "$url" -o "$tmp"
-chmod +x "$tmp"
+curl -fsSL "$url" | tar -xzf - -C "$tmp" bb
+chmod +x "$tmp/bb"
 
 target="${dir}/bb"
 if [ -w "$dir" ]; then
-    mv "$tmp" "$target"
+    mv "$tmp/bb" "$target"
 else
     echo "==> ${dir} is not writable, using sudo"
-    sudo mv "$tmp" "$target"
+    sudo mv "$tmp/bb" "$target"
 fi
 
 echo "==> Installed to ${target}"
