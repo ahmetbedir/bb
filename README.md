@@ -25,9 +25,12 @@ required. `git` is needed for git-integrated commands, and `jq` is optional
 Upgrade / uninstall:
 
 ```bash
-brew upgrade bb
-brew uninstall bb
+brew upgrade ahmetbedir/tap/bb
+brew uninstall ahmetbedir/tap/bb
 ```
+
+Use the full name: Homebrew also has an unrelated `bb` cask, and the short
+name resolves to that.
 
 ### Without Homebrew
 
@@ -344,7 +347,7 @@ bb skill:install -g -a claude-code -a cursor   # only these agents
 pinned to your bb version so the skill matches the flags your binary has.
 Without Node.js it copies the skill into Claude Code's skills directory instead.
 
-A global install (`-g`) follows bb upgrades: after `brew upgrade bb`, the
+A global install (`-g`) follows bb upgrades: after `brew upgrade ahmetbedir/tap/bb`, the
 first `bb` command reinstalls the skill for the new version once (a note goes
 to stderr). Turn this off with `bb config skill_auto_update off`. Project
 installs and explicit `--ref` pins are left alone. When an agent runs bb and
