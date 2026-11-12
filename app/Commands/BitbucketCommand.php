@@ -804,7 +804,13 @@ abstract class BitbucketCommand extends Command
 
         try {
             // macOS: our own app, so the notification shows "bb" and its icon.
-            if ($this->laravel->make(MacNotifier::class)->send($title, $message)) {
+            $mac = $this->laravel->make(MacNotifier::class);
+
+            if ($mac->wasDenied()) {
+                $this->stderr('Desktop notifications from bb are turned off. Turn them on in System Settings > Notifications > bb.');
+            }
+
+            if ($mac->send($title, $message)) {
                 return;
             }
 
@@ -990,7 +996,11 @@ abstract class BitbucketCommand extends Command
                 $values = array_merge($values, $data['values'] ?? []);
 
                 if ($limit !== null && count($values) >= $limit) {
-                    if (count($values) > $limit || filled($data['next'] ?? null)) {
+                    // Only when the user's --limit cut the list: internal lookups
+                    // (e.g. "the latest pipeline", limit 1) are not truncation.
+                    $userLimit = $this->hasOption('limit') && (int) $this->option('limit') === $limit;
+
+                    if ($userLimit && (count($values) > $limit || filled($data['next'] ?? null))) {
                         $this->stderr("Showing the first {$limit} results; more exist (raise --limit to see them).");
                     }
 

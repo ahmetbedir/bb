@@ -21,7 +21,10 @@ it('installs the app once, registers it and posts through LaunchServices', funct
         ->and(fileperms("{$this->installed}/Contents/MacOS/bb-notifier") & 0777)->toBe(0755);
 
     Process::assertRan(fn ($p) => str_ends_with($p->command[0], '/lsregister') && $p->command[2] === $this->installed);
-    Process::assertRan(fn ($p) => $p->command === ['open', '-g', '-a', $this->installed, '--args', '-title', 'Pipeline #42', '-message', 'Finished']);
+    Process::assertRan(fn ($p) => $p->command === [
+        'open', '-g', '-a', $this->installed, '--args', '-title', 'Pipeline #42', '-message', 'Finished',
+        '-status', "{$this->tmp}/support/notifier-status",
+    ]);
 
     // Already up to date: no second copy or registration.
     $notifier->send('again', 'x');
@@ -43,4 +46,14 @@ it('replaces an outdated install after a bb upgrade', function () {
 it('declines when there is no bundled app, so bb falls back to JoliNotif', function () {
     expect((new MacNotifier('/nonexistent', "{$this->tmp}/support"))->send('t', 'm'))->toBeFalse();
     Process::assertNothingRan();
+});
+
+it('reports when the app found notifications turned off', function () {
+    $notifier = new MacNotifier($this->bundled, "{$this->tmp}/support");
+    expect($notifier->wasDenied())->toBeFalse();
+
+    mkdir("{$this->tmp}/support", 0755, true);
+    file_put_contents("{$this->tmp}/support/notifier-status", 'denied');
+
+    expect($notifier->wasDenied())->toBeTrue();
 });

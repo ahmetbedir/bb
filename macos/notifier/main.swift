@@ -1,6 +1,9 @@
 // bb Notifier: posts one native macOS notification as "bb" (with bb's icon)
 // and exits. bb launches it through LaunchServices (`open -g -a`):
-//   bb-notifier -title <title> -message <message>
+//   bb-notifier -title <title> -message <message> [-status <file>]
+//
+// With -status, it writes "denied" to <file> when macOS refuses notifications
+// and deletes the file once one is delivered, so bb can tell the user.
 //
 // It runs as a real (Dock-less) AppKit app: macOS only shows the "allow
 // notifications" prompt to processes that check in as applications.
@@ -9,12 +12,14 @@ import UserNotifications
 
 var title = "bb"
 var message = ""
+var statusFile: String?
 var args = CommandLine.arguments.dropFirst().makeIterator()
 
 while let arg = args.next() {
     switch arg {
     case "-title": title = args.next() ?? title
     case "-message": message = args.next() ?? message
+    case "-status": statusFile = args.next()
     default: break
     }
 }
@@ -31,6 +36,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
         // The first call shows macOS's "Allow notifications from bb?" prompt.
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             guard granted else {
+                if let statusFile { try? "denied".write(toFile: statusFile, atomically: true, encoding: .utf8) }
                 fail("notifications are not allowed (\(error?.localizedDescription ?? "denied"))", 3)
             }
 
@@ -41,6 +47,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
 
             center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)) { error in
                 if let error { fail(error.localizedDescription, 4) }
+                if let statusFile { try? FileManager.default.removeItem(atPath: statusFile) }
                 exit(0)
             }
         }

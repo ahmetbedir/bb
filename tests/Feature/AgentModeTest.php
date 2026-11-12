@@ -244,3 +244,11 @@ it('does not follow pagination links to another host', function () {
     expect($code)->toBe(1);
     $mock->assertNotSent(NextPageRequest::class);
 });
+
+it('says when --limit cut the list short', function () {
+    MockClient::global([ListPullRequests::class => MockResponse::make(['values' => [onePr(), onePr()], 'next' => 'https://api.bitbucket.org/2.0/x?page=2'], 200)]);
+
+    [, $output] = runCommand('pr:list', ['--repo' => 'acme/api', '--limit' => 1], decorated: false);
+
+    expect($output)->toContain('Showing the first 1 results');
+});

@@ -50,8 +50,23 @@ class MacNotifier
         }
 
         // -g: don't steal focus. Not waiting (-W): the first run blocks on
-        // the permission prompt, which must not stall the bb command.
-        return Process::run(['open', '-g', '-a', $app, '--args', '-title', $title, '-message', $message])->successful();
+        // the permission prompt, which must not stall the bb command. The app
+        // reports a refusal through the status file, read on the next call.
+        return Process::run(['open', '-g', '-a', $app, '--args', '-title', $title, '-message', $message, '-status', $this->statusFile()])->successful();
+    }
+
+    /**
+     * Whether the last notification was refused because notifications for
+     * bb are turned off in System Settings.
+     */
+    public function wasDenied(): bool
+    {
+        return is_file($this->statusFile()) && trim((string) file_get_contents($this->statusFile())) === 'denied';
+    }
+
+    private function statusFile(): string
+    {
+        return $this->installDir.'/notifier-status';
     }
 
     /**

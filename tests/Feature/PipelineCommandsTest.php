@@ -222,3 +222,15 @@ it('reports a step without a test report as a normal outcome', function () {
     expect($output)->toContain('no test report');
     expect($code)->toBe(0);
 });
+
+it('does not call the internal "latest pipeline" lookup a truncated list', function () {
+    MockClient::global([
+        ListPipelines::class => MockResponse::make(['values' => [pipelinePayload()], 'next' => 'https://api.bitbucket.org/2.0/x?page=2'], 200),
+        GetPipeline::class => MockResponse::make(pipelinePayload(), 200),
+        ListPipelineSteps::class => MockResponse::make(['values' => stepPayloads()], 200),
+    ]);
+
+    [, $output] = runCommand('pipeline:view', ['--repo' => 'acme/api']);
+
+    expect($output)->not->toContain('raise --limit');
+});
